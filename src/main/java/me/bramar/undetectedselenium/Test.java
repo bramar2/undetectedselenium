@@ -43,7 +43,8 @@ class Test {
                 .autoOpenDevtools(true)
                 .serviceBuilder(new ChromeDriverService.Builder().withSilent(true).withLogLevel(ChromiumDriverLogLevel.OFF))
                 .seleniumStealth(SeleniumStealthOptions.getDefault()).build();
-        System.out.println("Capabilities: " + driver.getCapabilities().asMap());
+        driver.getDriver().findElement(null).sendKeys();
+//        System.out.println("Capabilities: " + driver.getDriver().);
         System.out.println("Bypassed: " + driver.cloudflareGet(testUrl));
         w();
         driver.quit();
