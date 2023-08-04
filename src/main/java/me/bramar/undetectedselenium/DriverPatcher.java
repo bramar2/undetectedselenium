@@ -1,0 +1,323 @@
+package me.bramar.undetectedselenium;
+
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import lombok.Getter;
+
+import javax.annotation.Nullable;
+import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Random;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+// ported from Python undetected-chromedriver
+@Getter
+public class DriverPatcher {
+    private static final String chromeLabsRepo = "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing";
+    private String urlRepo = "https://chromedriver.storage.googleapis.com";
+    private final String zipName;
+    private File executablePath;
+    private int versionMain;
+    private String versionFull;
+    private File dataPath;
+    private boolean customExePath;
+    private boolean isPosix;
+    private final File zipPath;
+    private final boolean chromeLabs;
+    private final boolean onlyStableBuilds;
+
+    public DriverPatcher(@Nullable String executablePath,
+                         int versionMain /* 0 = automatic */,
+                         boolean chromeLabs,
+                         boolean onlyStableBuilds /* setting for chromeLabs=true and versionMain=0, otherwise no impact*/) throws IOException {
+        this.chromeLabs = chromeLabs;
+        this.onlyStableBuilds = onlyStableBuilds;
+        if(chromeLabs) urlRepo = chromeLabsRepo;
+        String osName = System.getProperty("os.name", "").toLowerCase();
+        isPosix = false;
+        String exeName;
+        String _zipName;
+        if(osName.contains("windows")) {
+            _zipName = "chromedriver_win32.zip";
+            exeName = "chromedriver.exe";
+            dataPath = userPath("appdata/roaming/java_undetected_chromedriver");
+        }else {
+            exeName = "chromedriver";
+            if(osName.contains("nux")) {
+                _zipName = "chromedriver_linux64.zip";
+                dataPath = userPath(".local/share/java_undetected_chromedriver");
+                isPosix = true;
+            }else if(osName.contains("darwin") || osName.contains("mac")) {
+                _zipName = chromeLabs ? "chromedriver-mac-x64.zip" : "chromedriver_mac64.zip";
+                dataPath = userPath("Library/Application Support/java_undetected_chromedriver");
+                isPosix = true;
+            }else {
+                dataPath = userPath(".java_undetected_chromedriver");
+                _zipName = "chromedriver_%s.zip";
+            }
+            if(System.getenv().containsKey("LAMBDA_TASK_ROOT")) {
+                dataPath = new File("tmp/java_undetected_chromedriver");
+            }
+        }
+        if(chromeLabs) _zipName = _zipName.replace("_", "-");
+        this.zipName = _zipName;
+        customExePath = false;
+        if(!dataPath.exists()) {
+            Files.createDirectory(dataPath.toPath());
+        }
+        if(executablePath == null) {
+            this.executablePath = new File(dataPath, "java_undetected_" + fetchReleaseNumber() + "_" + exeName);
+        }
+        if(!isPosix && executablePath != null && !executablePath.endsWith(".exe")) {
+            executablePath += ".exe";
+        }
+
+        zipPath = new File(dataPath, "java_undetected");
+        // removed code that makes it relative to program working dir
+
+        if(executablePath != null) {
+            customExePath = true;
+            this.executablePath = new File(executablePath);
+        }
+        this.versionMain = versionMain;
+        this.versionFull = null;
+    }
+    private File userPath(String file) {
+        return new File(new File(System.getProperty("user.home")), file);
+    }
+    public boolean isBinaryPatched() {
+        return isBinaryPatched(null);
+    }
+
+    public boolean isBinaryPatched(File executablePath) {
+        executablePath = executablePath == null ? this.executablePath : executablePath;
+        String patternString = "undetected chromedriver";
+        char[] pattern = patternString.toCharArray();
+        int patternLen = pattern.length;
+        int b;
+        try(FileInputStream in = new FileInputStream(executablePath)) {
+            byte[] buffer = new byte[4096];
+            int len;
+            a:
+            while((len = in.read(buffer)) > 0) {
+                b:
+                for(int i = 0; i < len; i++) {
+                    if(buffer[i] == pattern[0]) {
+                        for(int offset = 1; offset < patternLen; offset++) {
+                            if((i + offset) >= len) {
+                                if((b = in.read()) == -1)
+                                    return false;
+                                if(b != pattern[offset])
+                                    continue a;
+                            }else if(buffer[i + offset] != pattern[offset]) {
+                                i += offset;
+                                continue b;
+                            }
+                        }
+                        return true;
+                    }
+                }
+            }
+        }catch(IOException ignored) {}
+        return false;
+    }
+
+    public void auto(@Nullable String executablePath, int versionMain) throws IOException {
+        String release = fetchReleaseNumber();
+        String[] dotSplit = release.split("\\.");
+        this.versionMain = Integer.parseInt(dotSplit[0]);
+        this.versionFull = release;
+        if(executablePath != null) {
+            this.executablePath = new File(executablePath);
+            customExePath = true;
+        }
+        if(customExePath) {
+            boolean patched = isBinaryPatched(this.executablePath);
+            if(!patched) {
+                patchExe();
+            }
+            return;
+        }
+
+        if(versionMain != 0) {
+            this.versionMain = versionMain;
+        }
+        if(this.executablePath.exists()) {
+            if(isBinaryPatched())
+                return;
+            this.executablePath.delete();
+        }
+        File downloaded = fetchPackage();
+        unzipPackage(downloaded);
+        downloaded.delete();
+        patchExe();
+    }
+    public void unzipPackage(File zipFile) throws IOException {
+        if(this.executablePath.exists() && !this.executablePath.delete()) {
+            Files.delete(this.executablePath.toPath());
+        }
+        try(FileSystem fs = FileSystems.newFileSystem(zipFile.toPath(), Collections.emptyMap())) {
+            for(Path p : Files.walk(fs.getRootDirectories().iterator().next()).toList()) {
+                if(p.getFileName() != null && p.getFileName().toString().matches(".*chromedriver\\.exe")) {
+                    Files.copy(p, executablePath.toPath());
+                    return;
+                }
+            }
+        }
+    }
+    public File fetchPackage() throws IOException {
+        File tempFolder = new File(System.getProperty("java.io.tmpdir"));
+        File outFile = new File(tempFolder, "ju-chromedriver-" + this.versionMain + "-" + new Random().nextInt(999_999) + ".zip");
+        URL url = new URL("%s/%s/%s".formatted(urlRepo, versionFull, chromeLabs ? zipName.replace(".zip","")
+                .replace("chromedriver-", "") + "/" + zipName : zipName));
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+        connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36");
+        connection.connect();
+        int res = connection.getResponseCode();
+        if(res != 200) {
+            connection.disconnect();
+            return null;
+        }
+        try(FileOutputStream out = new FileOutputStream(outFile);
+            InputStream in = connection.getInputStream()) {
+            byte[] buffer = new byte[4096];
+            int len;
+            while((len = in.read(buffer)) > 0) {
+                if(len == 4096) out.write(buffer);
+                else {
+                    byte[] slice = new byte[len];
+                    System.arraycopy(buffer, 0, slice, 0, len);
+                    out.write(slice);
+                }
+            }
+        }
+        connection.disconnect();
+        return outFile;
+    }
+    private String _fetchFromCFT() throws IOException {
+        if(versionMain != 0 && versionMain < 113) throw new IllegalArgumentException("version 112 and below is not available from chromelabs/chrome for testing");
+
+        String latestStableBuild = null;
+        if(onlyStableBuilds && versionMain == 0) {
+            URL url = new URL("https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json");
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36");
+            connection.connect();
+            String message;
+            try(InputStream is = connection.getInputStream()) {
+                message = new String(is.readAllBytes());
+            }
+            int res = connection.getResponseCode();
+            connection.disconnect();
+            if(res < 200 || res > 299) {
+                throw new IOException(connection.getURL() + " Response code " + connection.getResponseCode() + " with message " + message.substring(0, Math.min(message.length(), 100)));
+            }else {
+                latestStableBuild = JsonParser.parseString(message).getAsJsonObject()
+                        .getAsJsonObject("channels").getAsJsonObject("Stable").get("version").getAsString();
+            }
+        }
+
+
+
+        URL url = new URL("https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone.json");
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+        connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36");
+        connection.connect();
+        String message;
+        try(InputStream is = connection.getInputStream()) {
+            message = new String(is.readAllBytes());
+        }
+        int res = connection.getResponseCode();
+        connection.disconnect();
+        if(res < 200 || res > 299) {
+            throw new IOException(connection.getURL() + " Response code " + connection.getResponseCode() + " with message " + message.substring(0, Math.min(message.length(), 100)));
+        }else {
+            JsonObject json = JsonParser.parseString(message).getAsJsonObject();
+            JsonObject milestones = json.getAsJsonObject("milestones");
+            if(milestones.has(versionMain+""))
+                return milestones.getAsJsonObject(versionMain+"").get("version").getAsString();
+            else if(versionMain == 0) {
+                if(onlyStableBuilds) {
+                    return latestStableBuild;
+                }else {
+                    // not recommended since Canary/Dev/Beta builds can be unstable
+                    int highestMainVersion = milestones.keySet().stream().mapToInt(Integer::parseInt).max().orElse(0);
+                    if(highestMainVersion == 0)
+                        throw new IllegalStateException("failed to get release number from CFT, please manually input the version for chrome driver");
+                    return milestones.getAsJsonObject(highestMainVersion + "").get("version").getAsString();
+                }
+            }else
+                throw new IllegalArgumentException("version " + versionMain + " is not available");
+        }
+    }
+    private String _fetch() throws IOException {
+        String path = "/latest_release";
+        if(versionMain != 0)
+            path += "_" + versionMain;
+        URL url = new URL(this.urlRepo + path.toUpperCase());
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+        connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36");
+        connection.connect();
+        String message;
+        try(InputStream is = connection.getInputStream()) {
+            message = new String(is.readAllBytes());
+        }
+        int res = connection.getResponseCode();
+        connection.disconnect();
+        if(res < 200 || res > 299) {
+            throw new IOException("Response code " + connection.getResponseCode() + " with message " + message.substring(0, Math.min(message.length(), 100)));
+        }else
+            return message;
+    }
+
+    public String fetchReleaseNumber() throws IOException {
+        return chromeLabs ? _fetchFromCFT() : _fetch();
+    }
+    public void patchExe() throws IOException {
+//        if(true) return;
+        StringBuilder contentBuilder = new StringBuilder();
+        try(FileReader reader = new FileReader(this.executablePath, StandardCharsets.ISO_8859_1)) {
+            char[] buffer = new char[8192];
+            int len;
+            while((len = reader.read(buffer)) > 0) {
+                if(len == buffer.length) contentBuilder.append(buffer);
+                else {
+                    char[] slice = new char[len];
+                    System.arraycopy(buffer, 0, slice, 0, len);
+                    contentBuilder.append(slice);
+                }
+            }
+        }
+        String content = contentBuilder.toString();
+        int oldLength = content.length();
+        Matcher matcher = Pattern.compile("\\{window\\.cdc.*?;\\}").matcher(content);
+        while(matcher.find()) {
+            int len = matcher.group().length();
+            String toReplace = "{let a=\"undetected chromedriver\"}";
+            String filler = "A".repeat(len - toReplace.length());
+            toReplace = toReplace.replace("chromedriver", "chromedriver" + filler);
+            content = content.substring(0, matcher.start()) + toReplace + content.substring(matcher.end());
+        }
+        content = content.replaceAll("window\\.cdc", "window.arh");
+        if(content.length() == oldLength) {
+            System.out.println("Something went wrong patching the binary, could not find injection code block");
+        }
+        try(FileWriter writer = new FileWriter(this.executablePath, StandardCharsets.ISO_8859_1)) {
+            writer.write(content.toCharArray());
+        }
+    }
+}
