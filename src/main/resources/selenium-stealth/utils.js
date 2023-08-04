@@ -454,4 +454,5 @@
   }
 
   utils.preloadCache()
+  globalThis.window.utils = utils;
 }
