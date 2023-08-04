@@ -11,6 +11,7 @@ import java.util.Scanner;
 class Test {
     private static final String testUrl = "https://nowsecure.nl/";
     public static void main(String[] args) throws IOException, ReflectiveOperationException {
+        System.out.println();
         test3();
     }
     public static void w() {
