@@ -110,9 +110,10 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
         }catch(InterruptedException ignored) {}
     }
     /**
-     * cloudflareGet(url): Can bypass CF but isnt guaranteed to work (especially on VPN/Data center IPs), takes 10s (not recommended to use on a non-cloudflare site)
+     * Can bypass CF but isnt guaranteed to work (especially on VPN/Data center IPs)
+     * Takes 10s (not recommended to use on a non-cloudflare site)
      * @param url CF-protected site
-     * @return true if success, otherwise false
+     * @return true if success (no checkbox detected), otherwise false
      */
     public boolean cloudflareGet(String url) {
         return cloudflareGet(url, 10000);
@@ -122,7 +123,7 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
      * @see UndetectedChromeDriver#cloudflareGet(String)
      * @param url CF-protected site
      * @param timeToWait wait time for CF to process in milliseconds
-     * @return true if success, otherwise false
+     * @return true if success (no checkbox detected), otherwise false
      */
     public boolean cloudflareGet(String url, int timeToWait) {
         try {
