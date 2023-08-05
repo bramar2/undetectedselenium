@@ -13,9 +13,7 @@ import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -73,12 +71,8 @@ public class DriverPatcher {
         latestStable = new File(dataPath, "LATEST_STABLE");
         if(chromeLabs) _zipName = _zipName.replace("_", "-");
         this.zipName = _zipName;
-        customExePath = false;
         if(!dataPath.exists()) {
             Files.createDirectory(dataPath.toPath());
-        }
-        if(executablePath == null) {
-            this.executablePath = new File(dataPath, "java_undetected_" + fetchReleaseNumber().substring(1) + "_" + exeName);
         }
         if(!isPosix && executablePath != null && !executablePath.endsWith(".exe")) {
             executablePath += ".exe";
@@ -88,8 +82,10 @@ public class DriverPatcher {
         // removed code that makes it relative to program working dir
 
         if(executablePath != null) {
-            customExePath = true;
             this.executablePath = new File(executablePath);
+            this.customExePath = true;
+        }else {
+            this.executablePath = new File(dataPath, "java_undetected_" + fetchReleaseNumber().substring(1) + "_" + exeName);
         }
         this.versionMain = versionMain;
         this.versionFull = null;
@@ -135,6 +131,13 @@ public class DriverPatcher {
     }
 
     public void auto(int versionMain) throws IOException {
+        if(customExePath) {
+            boolean patched = isBinaryPatched(this.executablePath);
+            if(!patched) {
+                patchExe();
+            }
+            return;
+        }
         String release = fetchReleaseNumber();
         boolean isCached = release.startsWith("C");
         release = release.substring(1);
@@ -180,13 +183,6 @@ public class DriverPatcher {
             return;
         }else
             this.versionFull = release;
-        if(customExePath) {
-            boolean patched = isBinaryPatched(this.executablePath);
-            if(!patched) {
-                patchExe();
-            }
-            return;
-        }
 
         if(versionMain != 0) {
             this.versionMain = versionMain;
