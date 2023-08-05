@@ -131,7 +131,7 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
         }catch(MalformedURLException e) {
             throw new IllegalArgumentException(e);
         }
-        get("about:blank");
+        get("http://google.com");
         Set<String> pre = getWindowHandles();
         driver.navigate().refresh();
         delay();
