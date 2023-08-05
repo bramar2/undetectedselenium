@@ -507,8 +507,6 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
                 options.addArguments("--user-agent=" + userAgent);
             if(binaryExecutable != null)
                 options.setBinary(binaryExecutable);
-//            System.out.println("Capabilities " + abbreviate(new IdentityHashMap<>(), options.asMap()));
-//            System.out.println("Executable " + driverExecutable);
             serviceBuilder.usingDriverExecutable(driverExecutable);
             UndetectedChromeDriver driver = new UndetectedChromeDriver(
                     serviceBuilder.build(),
