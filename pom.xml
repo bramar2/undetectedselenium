@@ -12,6 +12,7 @@
         <maven.compiler.target>17</maven.compiler.target>
     </properties>
 
+<!--    selenium-java and gson is required to use this library -->
     <dependencies>
         <dependency>
             <groupId>org.seleniumhq.selenium</groupId>
