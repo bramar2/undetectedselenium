@@ -12,14 +12,6 @@
         <maven.compiler.target>17</maven.compiler.target>
     </properties>
 
-    <distributionManagement>
-        <repository>
-            <id>github</id>
-            <name>GitHub bramar2 Maven Packages</name>
-            <url>https://maven.pkg.github.com/bramar2/UndetectedSelenium</url>
-        </repository>
-    </distributionManagement>
-
 <!--    selenium-java and gson is required to use this library -->
     <dependencies>
         <dependency>
