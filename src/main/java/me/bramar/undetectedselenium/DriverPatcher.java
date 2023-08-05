@@ -3,6 +3,8 @@ package me.bramar.undetectedselenium;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import lombok.Getter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.io.*;
@@ -21,6 +23,7 @@ import java.util.regex.Pattern;
 // ported from Python undetected-chromedriver
 @Getter
 public class DriverPatcher {
+    private static final Logger logger = LoggerFactory.getLogger(DriverPatcher.class);
     private static final String chromeLabsRepo = "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing";
     private final File latestStable;
     private String urlRepo = "https://chromedriver.storage.googleapis.com";
@@ -352,7 +355,6 @@ public class DriverPatcher {
         }
     }
     public void patchExe() throws IOException {
-//        if(true) return;
         StringBuilder contentBuilder = new StringBuilder();
         try(FileReader reader = new FileReader(this.executablePath, StandardCharsets.ISO_8859_1)) {
             char[] buffer = new char[8192];
@@ -367,9 +369,10 @@ public class DriverPatcher {
             }
         }
         String content = contentBuilder.toString();
-        int oldLength = content.length();
         Matcher matcher = Pattern.compile("\\{window\\.cdc.*?;\\}").matcher(content);
+        boolean found = false;
         while(matcher.find()) {
+            found = true;
             int len = matcher.group().length();
             String toReplace = "{let a=\"undetected chromedriver\"}";
             String filler = "A".repeat(len - toReplace.length());
@@ -377,9 +380,8 @@ public class DriverPatcher {
             content = content.substring(0, matcher.start()) + toReplace + content.substring(matcher.end());
         }
         content = content.replaceAll("window\\.cdc", "window.arh");
-        if(content.length() == oldLength) {
-            System.out.println("Something went wrong patching the binary, could not find injection code block");
-        }
+        if(!found) logger.warn("Something went wrong patching the binary, could not find injection code block");
+
         try(FileWriter writer = new FileWriter(this.executablePath, StandardCharsets.ISO_8859_1)) {
             writer.write(content.toCharArray());
         }
