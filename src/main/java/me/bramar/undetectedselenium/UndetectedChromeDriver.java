@@ -354,6 +354,7 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
         private boolean noSandbox = true;
         private boolean enableCdpEvents = false;
         private boolean autoOpenDevtools = false;
+        private boolean patchProvidedDriver = false;
         private boolean driverFromCFT = false; // driver from chrome for testing (googlechromelabs.github.io)
         private boolean onlyStableCFT = true; // recommended to be true
         private Map<String, Object> desiredCapabilities = new HashMap<>();
@@ -381,6 +382,9 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
                 patcher = new DriverPatcher(null, versionMain, driverFromCFT, onlyStableCFT);
                 patcher.auto(0);
                 driverExecutable = patcher.getExecutablePath();
+            }else if(patchProvidedDriver) {
+                patcher = new DriverPatcher(driverExecutable.getAbsolutePath(), 0, false, true);
+                patcher.auto(0);
             }
 
             int debugPort = port != 0 ? port : PortProber.findFreePort();
