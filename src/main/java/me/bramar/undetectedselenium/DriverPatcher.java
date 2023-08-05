@@ -13,9 +13,9 @@ import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
+import java.util.List;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -24,6 +24,7 @@ import java.util.regex.Pattern;
 @Getter
 public class DriverPatcher {
     private static final String chromeLabsRepo = "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing";
+    private final File latestStable;
     private String urlRepo = "https://chromedriver.storage.googleapis.com";
     private final String zipName;
     private File executablePath;
@@ -69,6 +70,7 @@ public class DriverPatcher {
                 dataPath = new File("tmp/java_undetected_chromedriver");
             }
         }
+        latestStable = new File(dataPath, "LATEST_STABLE");
         if(chromeLabs) _zipName = _zipName.replace("_", "-");
         this.zipName = _zipName;
         customExePath = false;
@@ -76,7 +78,7 @@ public class DriverPatcher {
             Files.createDirectory(dataPath.toPath());
         }
         if(executablePath == null) {
-            this.executablePath = new File(dataPath, "java_undetected_" + fetchReleaseNumber() + "_" + exeName);
+            this.executablePath = new File(dataPath, "java_undetected_" + fetchReleaseNumber().substring(1) + "_" + exeName);
         }
         if(!isPosix && executablePath != null && !executablePath.endsWith(".exe")) {
             executablePath += ".exe";
@@ -132,15 +134,52 @@ public class DriverPatcher {
         return false;
     }
 
-    public void auto(@Nullable String executablePath, int versionMain) throws IOException {
+    public void auto(int versionMain) throws IOException {
         String release = fetchReleaseNumber();
+        boolean isCached = release.startsWith("C");
+        release = release.substring(1);
         String[] dotSplit = release.split("\\.");
         this.versionMain = Integer.parseInt(dotSplit[0]);
-        this.versionFull = release;
-        if(executablePath != null) {
-            this.executablePath = new File(executablePath);
-            customExePath = true;
-        }
+        if(isCached && !this.executablePath.exists() && !customExePath) {
+            // No internet fail-safe (uses latest stable driver available)
+            File[] files = dataPath.listFiles();
+            if(files == null)
+                throw new IOException("Failed to fetch chrome driver and no local drivers available");
+            File driverFile = null;
+            int[] driver = null;
+            main:
+            for(File file : files) {
+                try {
+                    String name = file.getName();
+                    if(!name.endsWith(".exe") || !name.contains("driver")) continue;
+                    Matcher matcher = Pattern.compile("[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}")
+                            .matcher(name);
+                    if(!matcher.find()) continue;
+                    String version = matcher.group();
+                    String[] s = version.split("\\.");
+                    int[] versionSplit = new int[4];
+                    for(int i = 0; i < s.length; i++)
+                        versionSplit[i] = Integer.parseInt(s[i]);
+
+
+                    if(versionSplit[0] <= versionMain) {
+                        if(driver != null) {
+                            for(int i = 0; i < versionSplit.length; i++) {
+                                if(driver[i] > versionSplit[i]) continue main;
+                            }
+                        }
+                        driverFile = file;
+                        driver = versionSplit;
+                    }
+                }catch(NumberFormatException|ArrayIndexOutOfBoundsException ignored) {}
+            }
+            if(driverFile == null)
+                throw new IOException("Failed to fetch chromedriver and no local drivers available");
+            this.executablePath = driverFile;
+            patchExe();
+            return;
+        }else
+            this.versionFull = release;
         if(customExePath) {
             boolean patched = isBinaryPatched(this.executablePath);
             if(!patched) {
@@ -205,27 +244,41 @@ public class DriverPatcher {
         connection.disconnect();
         return outFile;
     }
+    private void fetchLatestStable() throws IOException {
+        URL url = new URL("https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json");
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        connection.setRequestMethod("GET");
+        connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36");
+        connection.connect();
+        String message;
+        try(InputStream is = connection.getInputStream()) {
+            message = new String(is.readAllBytes());
+        }
+        int res = connection.getResponseCode();
+        connection.disconnect();
+        if(res < 200 || res > 299) {
+            throw new IOException(connection.getURL() + " Response code " + connection.getResponseCode() + " with message " + message.substring(0, Math.min(message.length(), 100)));
+        }else {
+            String latestStableBuild = JsonParser.parseString(message).getAsJsonObject()
+                    .getAsJsonObject("channels").getAsJsonObject("Stable").get("version").getAsString();
+            try(FileWriter writer = new FileWriter(latestStable)) {
+                writer.write(latestStableBuild);
+            }
+        }
+    }
     private String _fetchFromCFT() throws IOException {
         if(versionMain != 0 && versionMain < 113) throw new IllegalArgumentException("version 112 and below is not available from chromelabs/chrome for testing");
 
+        IOException stableException = null;
         String latestStableBuild = null;
         if(onlyStableBuilds && versionMain == 0) {
-            URL url = new URL("https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json");
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36");
-            connection.connect();
-            String message;
-            try(InputStream is = connection.getInputStream()) {
-                message = new String(is.readAllBytes());
-            }
-            int res = connection.getResponseCode();
-            connection.disconnect();
-            if(res < 200 || res > 299) {
-                throw new IOException(connection.getURL() + " Response code " + connection.getResponseCode() + " with message " + message.substring(0, Math.min(message.length(), 100)));
-            }else {
-                latestStableBuild = JsonParser.parseString(message).getAsJsonObject()
-                        .getAsJsonObject("channels").getAsJsonObject("Stable").get("version").getAsString();
+            try {
+                fetchLatestStable();
+            }catch(IOException e) {stableException = e;}
+            if(latestStable.exists())  {
+                try(FileInputStream in = new FileInputStream(latestStable)) {
+                    latestStableBuild = new String(in.readAllBytes());
+                }catch(IOException e) {if(stableException == null) stableException = e;}
             }
         }
 
@@ -251,6 +304,8 @@ public class DriverPatcher {
                 return milestones.getAsJsonObject(versionMain+"").get("version").getAsString();
             else if(versionMain == 0) {
                 if(onlyStableBuilds) {
+                    if(latestStableBuild == null)
+                        throw new IOException("Failed to get latest stable build", stableException);
                     return latestStableBuild;
                 }else {
                     // not recommended since Canary/Dev/Beta builds can be unstable
@@ -285,7 +340,20 @@ public class DriverPatcher {
     }
 
     public String fetchReleaseNumber() throws IOException {
-        return chromeLabs ? _fetchFromCFT() : _fetch();
+        try {
+            return "R" + (chromeLabs ? _fetchFromCFT() : _fetch());
+        }catch(IOException e) {
+            if(latestStable.exists()) {
+                try(FileInputStream in = new FileInputStream(latestStable)) {
+                    return "C"+new String(in.readAllBytes());
+                }catch(IOException e2) {
+                    try {
+                        e2.initCause(e);
+                    }catch(IllegalStateException ignored) {}
+                    throw e2;
+                }
+            }else throw e;
+        }
     }
     public void patchExe() throws IOException {
 //        if(true) return;

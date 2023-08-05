@@ -379,7 +379,7 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
             DriverPatcher patcher = null;
             if(driverExecutable == null) {
                 patcher = new DriverPatcher(null, versionMain, driverFromCFT, onlyStableCFT);
-                patcher.auto(null, 0);
+                patcher.auto(0);
                 driverExecutable = patcher.getExecutablePath();
             }
 
