@@ -118,7 +118,6 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
     public boolean cloudflareGet(String url) {
         return cloudflareGet(url, 10000);
     }
-
     /**
      * @see UndetectedChromeDriver#cloudflareGet(String)
      * @param url CF-protected site
@@ -143,12 +142,13 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
             // WebDriverWait may trigger Cloudflare
             Thread.sleep(timeToWait);
         }catch(InterruptedException ignored) {}
+        close();
         Set<String> post = getWindowHandles();
         post.removeAll(pre);
-        close();
         switchTo().window(post.iterator().next());
         return driver.findElements(By.id("cf-stage")).isEmpty();
     }
+
     private boolean _legacyCloudflareGet(String url) {
         try {
             new URL(url);

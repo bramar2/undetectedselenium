@@ -9,9 +9,9 @@ import java.io.IOException;
 import java.util.Scanner;
 
 class Test {
-    private static final String testUrl = "https://nowsecure.nl/";
+    private static final String testUrl = "https://nowsecure.nl";
     public static void main(String[] args) throws IOException, ReflectiveOperationException {
-        test3();
+
     }
     public static void w() {
         Scanner scanner = new Scanner(System.in);
