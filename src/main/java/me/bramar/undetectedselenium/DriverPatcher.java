@@ -71,7 +71,7 @@ public class DriverPatcher {
                 dataPath = new File("tmp/java_undetected_chromedriver");
             }
         }
-        latestStable = new File(dataPath, "LATEST_STABLE");
+        this.latestStable = new File(dataPath, "LATEST_STABLE");
         if(chromeLabs) _zipName = _zipName.replace("_", "-");
         this.zipName = _zipName;
         if(!dataPath.exists()) {
@@ -195,6 +195,7 @@ public class DriverPatcher {
                 return;
             this.executablePath.delete();
         }
+        logger.info("Downloading chromedriver " + release);
         File downloaded = fetchPackage();
         unzipPackage(downloaded);
         downloaded.delete();
@@ -342,6 +343,7 @@ public class DriverPatcher {
         try {
             return "R" + (chromeLabs ? _fetchFromCFT() : _fetch());
         }catch(IOException e) {
+            logger.warn("Failed to fetch release number from " + (chromeLabs ? "CFT" : "chromedriver.storage.googleapis.com"), e);
             if(latestStable.exists()) {
                 try(FileInputStream in = new FileInputStream(latestStable)) {
                     return "C"+new String(in.readAllBytes());
