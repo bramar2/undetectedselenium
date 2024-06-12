@@ -7,7 +7,10 @@ import org.openqa.selenium.WebDriver;
 Wraps the original Target locator and updates user agent when switchTo().window() is called
  */
 class UCTargetLocator implements WebDriver.TargetLocator {
-    @Delegate(excludes = LombokDelegateExclude.TargetLocatorExclude.class)
+    private interface TargetLocatorExclude {
+        WebDriver window(String nameOrHandle);
+    }
+    @Delegate(excludes = TargetLocatorExclude.class)
     private final WebDriver.TargetLocator original;
     private final UndetectedChromeDriver driver;
 

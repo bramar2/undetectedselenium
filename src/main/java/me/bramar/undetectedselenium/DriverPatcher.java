@@ -19,12 +19,15 @@ import java.util.Collections;
 import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 // ported from Python undetected-chromedriver
 @Getter
 public class DriverPatcher {
     private static final Logger logger = LoggerFactory.getLogger(DriverPatcher.class);
-    private static final String chromeLabsRepo = "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing";
+//    old
+//    private static final String chromeLabsRepo = "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing";
+    private static final String chromeForTestingRepo = "https://storage.googleapis.com/chrome-for-testing-public";
     private final File latestStable;
     private String urlRepo = "https://chromedriver.storage.googleapis.com";
     private final String zipName;
@@ -35,22 +38,27 @@ public class DriverPatcher {
     private boolean customExePath;
     private boolean isPosix;
     private final File zipPath;
-    private final boolean chromeLabs;
+    private final boolean chromeForTesting;
     private final boolean onlyStableBuilds;
 
     public DriverPatcher(@Nullable String executablePath,
                          int versionMain /* 0 = automatic */,
-                         boolean chromeLabs,
+                         boolean chromeForTesting,
                          boolean onlyStableBuilds /* setting for chromeLabs=true and versionMain=0, otherwise no impact*/) throws IOException {
-        this.chromeLabs = chromeLabs;
+        this.chromeForTesting = chromeForTesting;
         this.onlyStableBuilds = onlyStableBuilds;
-        if(chromeLabs) urlRepo = chromeLabsRepo;
+        if(chromeForTesting) urlRepo = chromeForTestingRepo;
         String osName = System.getProperty("os.name", "").toLowerCase();
+        boolean is64bit = System.getProperty("os.arch").contains("64");
         isPosix = false;
         String exeName;
         String _zipName;
         if(osName.contains("windows")) {
-            _zipName = "chromedriver_win32.zip";
+            if(is64bit) {
+                _zipName = "chromedriver_win64.zip";
+            }else {
+                _zipName = "chromedriver_win32.zip";
+            }
             exeName = "chromedriver.exe";
             dataPath = userPath("appdata/roaming/java_undetected_chromedriver");
         }else {
@@ -60,7 +68,8 @@ public class DriverPatcher {
                 dataPath = userPath(".local/share/java_undetected_chromedriver");
                 isPosix = true;
             }else if(osName.contains("darwin") || osName.contains("mac")) {
-                _zipName = chromeLabs ? "chromedriver-mac-x64.zip" : "chromedriver_mac64.zip";
+                // FIXME: no check for ARM64 arch
+                _zipName = chromeForTesting ? "chromedriver-mac-x64.zip" : "chromedriver_mac64.zip";
                 dataPath = userPath("Library/Application Support/java_undetected_chromedriver");
                 isPosix = true;
             }else {
@@ -72,7 +81,7 @@ public class DriverPatcher {
             }
         }
         this.latestStable = new File(dataPath, "LATEST_STABLE");
-        if(chromeLabs) _zipName = _zipName.replace("_", "-");
+        if(chromeForTesting) _zipName = _zipName.replace("_", "-");
         this.zipName = _zipName;
         if(!dataPath.exists()) {
             Files.createDirectory(dataPath.toPath());
@@ -206,10 +215,12 @@ public class DriverPatcher {
             Files.delete(this.executablePath.toPath());
         }
         try(FileSystem fs = FileSystems.newFileSystem(zipFile.toPath(), Collections.emptyMap())) {
-            for(Path p : Files.walk(fs.getRootDirectories().iterator().next()).toList()) {
-                if(p.getFileName() != null && p.getFileName().toString().matches(".*chromedriver\\.exe")) {
-                    Files.copy(p, executablePath.toPath());
-                    return;
+            try(Stream<Path> stream = Files.walk(fs.getRootDirectories().iterator().next())) {
+                for(Path p : stream.toList()) {
+                    if(p.getFileName() != null && p.getFileName().toString().matches(".*chromedriver\\.exe")) {
+                        Files.copy(p, executablePath.toPath());
+                        return;
+                    }
                 }
             }
         }
@@ -217,8 +228,14 @@ public class DriverPatcher {
     public File fetchPackage() throws IOException {
         File tempFolder = new File(System.getProperty("java.io.tmpdir"));
         File outFile = new File(tempFolder, "ju-chromedriver-" + this.versionMain + "-" + new Random().nextInt(999_999) + ".zip");
-        URL url = new URL("%s/%s/%s".formatted(urlRepo, versionFull, chromeLabs ? zipName.replace(".zip","")
-                .replace("chromedriver-", "") + "/" + zipName : zipName));
+        String nameUrl;
+        if(chromeForTesting) {
+            String driverType = zipName.replace(".zip", "")
+                    .replace("chromedriver-", "");
+            // chromedriver-win32.zip -> win32
+            nameUrl = driverType + "/" + zipName;
+        }else nameUrl = zipName;
+        URL url = new URL("%s/%s/%s".formatted(urlRepo, versionFull, nameUrl));
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestMethod("GET");
         connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36");
@@ -341,9 +358,9 @@ public class DriverPatcher {
 
     public String fetchReleaseNumber() throws IOException {
         try {
-            return "R" + (chromeLabs ? _fetchFromCFT() : _fetch());
+            return "R" + (chromeForTesting ? _fetchFromCFT() : _fetch());
         }catch(IOException e) {
-            logger.warn("Failed to fetch release number from " + (chromeLabs ? "CFT" : "chromedriver.storage.googleapis.com"), e);
+            logger.warn("Failed to fetch release number from " + (chromeForTesting ? "CFT" : "chromedriver.storage.googleapis.com"), e);
             if(latestStable.exists()) {
                 try(FileInputStream in = new FileInputStream(latestStable)) {
                     return "C"+new String(in.readAllBytes());

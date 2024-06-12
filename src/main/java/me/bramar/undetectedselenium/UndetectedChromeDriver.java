@@ -42,9 +42,16 @@ import java.util.stream.Stream;
 
 // ported from Python undetected-chromedriver, uses some reflection
 
-public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, HasCapabilities, HasVirtualAuthenticator, Interactive, PrintsPage, TakesScreenshot,
-        HasAuthentication, HasBiDi, HasCasting, HasCdp, HasDevTools, HasLaunchApp, HasLogEvents, HasNetworkConditions, HasPermissions, LocationContext, NetworkConnection, WebStorage {
-    @Delegate(excludes = LombokDelegateExclude.UndetectedChromeDriverExclude.class)
+public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, HasCapabilities, HasVirtualAuthenticator, Interactive,
+        PrintsPage, TakesScreenshot, HasAuthentication, HasBiDi, HasCasting, HasCdp, HasDevTools, HasLaunchApp,
+        HasLogEvents, HasNetworkConditions, HasPermissions, LocationContext, NetworkConnection, WebStorage {
+    private interface UndetectedChromeDriverExclude {
+        void get(String url);
+        void quit();
+        Map<String, Object> executeCdpCommand(String commandName, Map<String, Object> parameters);
+        WebDriver.TargetLocator switchTo();
+    }
+    @Delegate(excludes = UndetectedChromeDriverExclude.class)
     @Getter private final ChromeDriver driver;
     @Getter private final ChromeOptions options;
     @Getter private final boolean overrideUserAgent;
@@ -136,20 +143,22 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
         delay();
         preGetScript();
         String uuid = UUID.randomUUID().toString();
-        String script = "window.open('%s', '%s');".formatted(url, uuid);
+        String script = "window.open('%s', '_blank');".formatted(url);
         driver.executeScript(script);
         try {
             // WebDriverWait may trigger Cloudflare
             Thread.sleep(timeToWait);
         }catch(InterruptedException ignored) {}
-        close();
+        String prev = getWindowHandle();
         Set<String> post = getWindowHandles();
         post.removeAll(pre);
+        post.remove(prev);
+        close();
         switchTo().window(post.iterator().next());
         return driver.findElements(By.id("cf-stage")).isEmpty();
     }
 
-    private boolean _legacyCloudflareGet(String url) {
+    public boolean _legacyCloudflareGet(String url) {
         try {
             new URL(url);
         }catch(MalformedURLException e) {
@@ -357,6 +366,7 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
         private boolean autoOpenDevtools = false;
         private boolean patchProvidedDriver = false;
         private boolean driverFromCFT = false; // driver from chrome for testing (googlechromelabs.github.io)
+        private boolean driverFromCFTset = false;
         private boolean onlyStableCFT = true; // recommended to be true
         private Map<String, Object> desiredCapabilities = new HashMap<>();
         private ChromeDriverService.Builder serviceBuilder;
@@ -365,6 +375,12 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
         private ChromeOptions options = new ChromeOptions();
         public UCBuilder desiredCapability(String key, String value) {
             desiredCapabilities.put(key, value);
+            return this;
+        }
+
+        public UCBuilder driverFromCFT(boolean driverFromCFT) {
+            this.driverFromCFT = driverFromCFT;
+            this.driverFromCFTset = true;
             return this;
         }
         public UndetectedChromeDriver build()
@@ -377,9 +393,20 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
                 experimentalField.setAccessible(true);
                 capsField.setAccessible(true);
             }
+
+            // Auto-set driverfromcft if >=113
+            if(!driverFromCFTset && versionMain >= 113) driverFromCFT = true;
+
             if(serviceBuilder == null) serviceBuilder = new ChromeDriverService.Builder();
             DriverPatcher patcher = null;
             if(driverExecutable == null) {
+                if(driverFromCFTset) {
+                    if(versionMain < 113 && driverFromCFT) {
+                        throw new IllegalArgumentException("chrome for testing only available for versions >= 113");
+                    }else if(versionMain >= 113 && !driverFromCFT) {
+                        throw new IllegalArgumentException("chromedriver versions >= 113 only available in chrome for testing");
+                    }
+                }
                 patcher = new DriverPatcher(null, versionMain, driverFromCFT, onlyStableCFT);
                 patcher.auto(0);
                 driverExecutable = patcher.getExecutablePath();
@@ -427,14 +454,9 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
                         new File(new File(System.getProperty("java.io.tmpdir")), "temp-java-uc-" + System.currentTimeMillis() + "-" + new Random().nextInt(100));
                 tempDir.mkdirs();
                 Runtime.getRuntime().addShutdownHook(shutdownHook = new Thread(() -> {
-                    for(int i = 0; i < 20; i++) {
-                        try {
-                            tryDelete(tempDir);
-                            if(!tempDir.exists()) return;
-                            Thread.sleep(500);
-                        }catch(InterruptedException e) {
-                            return;
-                        }
+                    for(int i = 0; i < 3; i++) {
+                        tryDelete(tempDir);
+                        if(!tempDir.exists()) return;
                     }
                     throw new IllegalStateException("failed to delete temp directory " + tempDir);
                 }));
@@ -508,6 +530,8 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
             if(binaryExecutable != null)
                 options.setBinary(binaryExecutable);
             serviceBuilder.usingDriverExecutable(driverExecutable);
+//            System.out.println(options.asMap());
+//            System.out.println(driverExecutable);
             UndetectedChromeDriver driver = new UndetectedChromeDriver(
                     serviceBuilder.build(),
                     options, shutdownHook, userAgent != null);

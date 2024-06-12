@@ -5,19 +5,19 @@
 
     <groupId>me.bramar.undetectedselenium</groupId>
     <artifactId>UndetectedSelenium</artifactId>
-    <version>1.1</version>
+    <version>1.2</version>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
     </properties>
 
-<!--    selenium-java and gson is required to use this library -->
+<!--    selenium-java and gson is required to use this library, change selenium-java version as needed -->
     <dependencies>
         <dependency>
             <groupId>org.seleniumhq.selenium</groupId>
             <artifactId>selenium-java</artifactId>
-            <version>4.10.0</version>
+            <version>4.21.0</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -28,6 +28,11 @@
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
             <version>2.10.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
+            <version>2.0.10</version>
         </dependency>
     </dependencies>
 </project>
