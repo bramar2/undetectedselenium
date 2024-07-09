@@ -11,7 +11,7 @@ Mac: Library/Application Support/java_undetected_chromedriver \
 Linux: .local/share/java_undetected_chromedriver \
 These are copied from undetected-chromedriver. Drivers are downloaded from: \
 CFT: https://storage.googleapis.com/chrome-for-testing-public \
-Legacy: https://chromedriver.storage.googleapis.com \
+Legacy: https://chromedriver.storage.googleapis.com
 
 ## Usage
 
