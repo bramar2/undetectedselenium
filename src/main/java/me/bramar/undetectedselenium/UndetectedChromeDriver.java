@@ -365,8 +365,8 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
         private boolean enableCdpEvents = false;
         private boolean autoOpenDevtools = false;
         private boolean patchProvidedDriver = false;
-        private boolean driverFromCFT = false; // driver from chrome for testing (googlechromelabs.github.io)
-        private boolean driverFromCFTset = false;
+        @Setter(AccessLevel.NONE) private boolean driverFromCFT = true; // driver from chrome for testing (googlechromelabs.github.io)
+        @Setter(AccessLevel.NONE) private boolean driverFromCFTset = false;
         private boolean onlyStableCFT = true; // recommended to be true
         private Map<String, Object> desiredCapabilities = new HashMap<>();
         private ChromeDriverService.Builder serviceBuilder;
@@ -400,7 +400,7 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
             if(serviceBuilder == null) serviceBuilder = new ChromeDriverService.Builder();
             DriverPatcher patcher = null;
             if(driverExecutable == null) {
-                if(driverFromCFTset) {
+                if(driverFromCFTset && versionMain > 0) {
                     if(versionMain < 113 && driverFromCFT) {
                         throw new IllegalArgumentException("chrome for testing only available for versions >= 113");
                     }else if(versionMain >= 113 && !driverFromCFT) {

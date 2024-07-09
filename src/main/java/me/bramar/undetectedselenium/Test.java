@@ -11,7 +11,7 @@ import java.util.Scanner;
 class Test {
     private static final String testUrl = "https://nowsecure.nl";
     public static void main(String[] args) throws IOException, ReflectiveOperationException {
-
+        test1();
     }
     public static void w() {
         Scanner scanner = new Scanner(System.in);
@@ -21,7 +21,10 @@ class Test {
         System.out.println("Quitting");
     }
     public static void test1() throws IOException, ReflectiveOperationException {
-        UndetectedChromeDriver driver = UndetectedChromeDriver.builder().userDataDir("C:\\Users\\marce\\AppData\\Local\\Temp\\temp-java-uc-1690730364883-28").build();
+        // UC, driverFromCFT currently defaults to false (which only allows versions <= 113)
+        UndetectedChromeDriver driver = UndetectedChromeDriver.builder()
+                .build();
+
         driver.cloudflareGet(testUrl);
         w();
         driver.quit();
