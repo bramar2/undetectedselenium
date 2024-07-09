@@ -1,7 +1,11 @@
 # Undetected Selenium
 
 A Java implementation of undetected selenium from popular python library undetected-chromedriver and selenium-stealth
-
+## Dependencies
+1. Selenium (org.seleniumhq.selenium:selenium-java)
+2. Gson (com.google.code.gson:gson)
+3. Slf4j-simple (org.slf4j:slf4j-simple)
+4. Lombok (org.projectlombok:lombok)
 ## Drivers
 
 ChromeDrivers downloaded through undetected-selenium will be stored at the following locations. \
@@ -11,7 +15,7 @@ Mac: Library/Application Support/java_undetected_chromedriver \
 Linux: .local/share/java_undetected_chromedriver \
 These are copied from undetected-chromedriver. Drivers are downloaded from: \
 CFT: https://storage.googleapis.com/chrome-for-testing-public \
-Legacy: https://chromedriver.storage.googleapis.com \
+Legacy: https://chromedriver.storage.googleapis.com
 
 ## Usage
 
