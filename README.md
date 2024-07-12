@@ -1,6 +1,6 @@
 # Undetected Selenium
 
-A Java implementation of undetected selenium from popular python library undetected-chromedriver and selenium-stealth
+A Java implementation of undetected selenium from python library undetected-chromedriver and selenium-stealth
 ## Dependencies
 1. Selenium (org.seleniumhq.selenium:selenium-java)
 2. Gson (com.google.code.gson:gson)
