@@ -1,11 +1,20 @@
 # Undetected Selenium
 
-A Java implementation of undetected selenium from python library undetected-chromedriver and selenium-stealth. \
-To use the library, you can clone the repository and just copy all code into your project.
+A Java implementation of undetected selenium from python library undetected-chromedriver and selenium-stealth.
+
+## Install
+
+To use the library, you can clone the repository and just copy all the code into your project. \
+If you plan on using selenium-stealth, make sure to include the JS files located at src/main/resources/selenium-stealth/\*.js. \
+The library tries to find JS in classpath:selenium-stealth/\*.js. SeleniumStealth will fail (or work unexpectedly) if not included.
+The JS files are from [Puppeteer's stealth plugin](https://github.com/berstend/puppeteer-extra/tree/master/packages/puppeteer-extra-plugin-stealth/evasions).
+
 ## Dependencies
+Make sure these dependencies are installed and up to date:
 1. Selenium (org.seleniumhq.selenium:selenium-java)
 2. Gson (com.google.code.gson:gson)
-3. Slf4j-simple (org.slf4j:slf4j-simple)
+3. Slf4j-simple (org.slf4j:slf4j-simple) \
+Slf4j-simple is used to log ChromeDriver downloads and errors for ChromeDriver downloads. If you do not want to use Slf4j-simple, you can remove the usage of it in `me.bramar.undetectedselenium.DriverPatcher`.
 4. Lombok (org.projectlombok:lombok)
 ## Drivers
 
