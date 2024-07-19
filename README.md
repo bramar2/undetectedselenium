@@ -1,12 +1,12 @@
 # Undetected Selenium
 
-A Java implementation of undetected selenium from python library undetected-chromedriver and selenium-stealth
+A Java implementation of undetected selenium from python library undetected-chromedriver and selenium-stealth. \
+To use the library, you can clone the repository and just copy all code into your project.
 ## Dependencies
 1. Selenium (org.seleniumhq.selenium:selenium-java)
 2. Gson (com.google.code.gson:gson)
 3. Slf4j-simple (org.slf4j:slf4j-simple)
 4. Lombok (org.projectlombok:lombok)
-To use the library, you can clone the repository and just copy all code into your project.
 ## Drivers
 
 ChromeDrivers downloaded through undetected-selenium will be stored at the following locations. \
