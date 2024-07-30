@@ -3,9 +3,9 @@
 A Java implementation of undetected selenium from python library undetected-chromedriver and selenium-stealth.
 ## Disclaimer
 UndetectedChromeDriver uses the Java Reflection API to access and modify private fields specifically on the following fields:
-- ChromiumOptions.args  \[Map<String, Object>]
-- ChromiumOptions.experimentalOptions \[Map<String, Object>]
-- MutableCapabilities.caps \[List\<String>]
+- org.openqa.selenium.chromium.ChromiumOptions args  \[Map<String, Object>]
+- org.openqa.selenium.chromium.ChromiumOptions experimentalOptions \[Map<String, Object>]
+- org.openqa.selenium.MutableCapabilities caps \[List\<String>]
 
 You can use SeleniumStealthOptions safely without reflection.
 ## Install
