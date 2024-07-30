@@ -1,13 +1,18 @@
 # Undetected Selenium
 
 A Java implementation of undetected selenium from python library undetected-chromedriver and selenium-stealth.
+## Disclaimer
+UndetectedChromeDriver uses the Java Reflection API to access and modify private fields specifically on the following fields:
+- ChromiumOptions.args  \[Map<String, Object>]
+- ChromiumOptions.experimentalOptions \[Map<String, Object>]
+- MutableCapabilities.caps \[List\<String>]
 
+You can use SeleniumStealthOptions safely without reflection.
 ## Install
 
-To use the library, you can clone the repository and just copy all the code into your project. \
+To use the library, you can clone the repository and just copy all the src code into your project. \
 If you plan on using selenium-stealth, make sure to include the JS files located at src/main/resources/selenium-stealth/\*.js. \
-The library tries to find JS in classpath:selenium-stealth/\*.js. SeleniumStealth will fail (or work unexpectedly) if not included.
-The JS files are from [Puppeteer's stealth plugin](https://github.com/berstend/puppeteer-extra/tree/master/packages/puppeteer-extra-plugin-stealth/evasions).
+The library tries to find selenium-stealth JS in classpath:selenium-stealth/\*.js. SeleniumStealth will fail (or work unexpectedly) if not included.
 
 ## Dependencies
 Make sure these dependencies are installed and up to date:
@@ -82,3 +87,7 @@ public class Main {
 
 
 Refer to `me.bramar.undetectedselenium.Test` for examples
+
+## Credit
+- Selenium-stealth/puppeteer-stealth JS files are from https://github.com/berstend/puppeteer-extra/tree/master/packages/puppeteer-extra-plugin-stealth/evasions
+- UndetectedChromeDriver stealth techniques are partially from https://github.com/ultrafunkamsterdam/undetected-chromedriver
