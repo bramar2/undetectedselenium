@@ -34,6 +34,7 @@ public class SeleniumStealthOptions {
         evaluateScript(driver, "webgl.vendor.js", webglVendor, renderer);
         overrideUserAgent(driver);
     }
+
     public void overrideUserAgent(HasCdp driver) {
         String userAgent = this.userAgent != null ? this.userAgent :
                 String.valueOf(driver.executeCdpCommand("Browser.getVersion", Collections.emptyMap())
@@ -48,11 +49,13 @@ public class SeleniumStealthOptions {
             override.put("platform", platform);
         driver.executeCdpCommand("Network.setUserAgentOverride", override);
     }
+
     public void evaluateEmpty(HasCdp driver, String... scriptFiles) {
         for(String scriptFile : scriptFiles) {
             evaluateScript(driver, scriptFile);
         }
     }
+
     public String evaluationString(String func, Object... args) {
         String argsString = "";
         for(int i = 0; i < args.length; i++) {
@@ -62,8 +65,8 @@ public class SeleniumStealthOptions {
                 argsString += ", ";
         }
         return "(%s)(%s)".formatted(func, argsString);
-
     }
+
     public void evaluateScript(HasCdp driver, String scriptName, Object... args) {
         String script = null;
         try(InputStream in = getClass().getClassLoader().getResourceAsStream("selenium-stealth/" + scriptName)) {
@@ -75,9 +78,11 @@ public class SeleniumStealthOptions {
                 "Page.addScriptToEvaluateOnNewDocument",
                 Map.of("source", evaluationString(script, args)));
     }
+
     public static SeleniumStealthOptions getDefault() {
         return builder().build();
     }
+
     public static class SeleniumStealthOptionsBuilder {
         // string example: "en-US,en"
         public SeleniumStealthOptionsBuilder languageArgument(String languageArg) {
