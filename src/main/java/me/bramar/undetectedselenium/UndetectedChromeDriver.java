@@ -363,24 +363,18 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
         private boolean enableCdpEvents = false;
         private boolean autoOpenDevtools = false;
         private boolean patchProvidedDriver = false;
-        @Setter(AccessLevel.NONE) private boolean driverFromCFT = true; // driver from chrome for testing (googlechromelabs.github.io)
-        @Setter(AccessLevel.NONE) private boolean driverFromCFTset = false;
         private boolean onlyStableCFT = true; // recommended to be true
         private Map<String, Object> desiredCapabilities = new HashMap<>();
         private ChromeDriverService.Builder serviceBuilder;
         private PageLoadStrategy pageLoadStrategy;
         private SeleniumStealthOptions seleniumStealth;
         private ChromeOptions options = new ChromeOptions();
+
         public UCBuilder desiredCapability(String key, String value) {
             desiredCapabilities.put(key, value);
             return this;
         }
 
-        public UCBuilder driverFromCFT(boolean driverFromCFT) {
-            this.driverFromCFT = driverFromCFT;
-            this.driverFromCFTset = true;
-            return this;
-        }
         public UndetectedChromeDriver build()
                 throws IllegalArgumentException, IOException, IllegalAccessException, NoSuchFieldException {
             if(argField == null || experimentalField == null || capsField == null) {
@@ -392,24 +386,16 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
                 capsField.setAccessible(true);
             }
 
-            // Auto-set driverfromcft if >=113
-            if(!driverFromCFTset && versionMain >= 113) driverFromCFT = true;
+            if(versionMain < 113) throw new IllegalArgumentException("chromedriver versions < 113 is no longer supported");
 
             if(serviceBuilder == null) serviceBuilder = new ChromeDriverService.Builder();
             DriverPatcher patcher = null;
             if(driverExecutable == null) {
-                if(driverFromCFTset && versionMain > 0) {
-                    if(versionMain < 113 && driverFromCFT) {
-                        throw new IllegalArgumentException("chrome for testing only available for versions >= 113");
-                    }else if(versionMain >= 113 && !driverFromCFT) {
-                        throw new IllegalArgumentException("chromedriver versions >= 113 only available in chrome for testing");
-                    }
-                }
-                patcher = new DriverPatcher(null, versionMain, driverFromCFT, onlyStableCFT);
+                patcher = new DriverPatcher(null, versionMain, onlyStableCFT);
                 patcher.auto(0);
                 driverExecutable = patcher.getExecutablePath();
             }else if(patchProvidedDriver) {
-                patcher = new DriverPatcher(driverExecutable.getAbsolutePath(), 0, false, true);
+                patcher = new DriverPatcher(driverExecutable.getAbsolutePath(), 0, true);
                 patcher.auto(0);
             }
 

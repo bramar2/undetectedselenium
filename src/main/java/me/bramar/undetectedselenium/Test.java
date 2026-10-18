@@ -40,7 +40,6 @@ class Test {
         UndetectedChromeDriver driver = UndetectedChromeDriver.builder()
                 .pageLoadStrategy(PageLoadStrategy.NONE)
                 .headless(false)
-                .driverFromCFT(true)
                 .versionMain(115)
                 .autoOpenDevtools(true)
                 .serviceBuilder(new ChromeDriverService.Builder().withSilent(true).withLogLevel(ChromiumDriverLogLevel.OFF))
@@ -58,7 +57,6 @@ class Test {
             UndetectedChromeDriver driver = UndetectedChromeDriver.builder()
                     .pageLoadStrategy(PageLoadStrategy.NONE)
                     .headless(headless)
-                    .driverFromCFT(true)
                     .versionMain(115)
                     .autoOpenDevtools(true)
                     .seleniumStealth(SeleniumStealthOptions.getDefault()).build();

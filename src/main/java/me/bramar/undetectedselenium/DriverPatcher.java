@@ -26,9 +26,8 @@ import java.util.stream.Stream;
 public class DriverPatcher {
     private static final Logger logger = LoggerFactory.getLogger(DriverPatcher.class);
 
-    private static final String chromeForTestingRepo = "https://storage.googleapis.com/chrome-for-testing-public";
     private final File latestStable;
-    private String urlRepo = "https://chromedriver.storage.googleapis.com";
+    private final String urlRepo = "https://storage.googleapis.com/chrome-for-testing-public";
     private final String zipName;
     private File executablePath;
     private int versionMain;
@@ -37,16 +36,12 @@ public class DriverPatcher {
     private boolean customExePath;
     private boolean isPosix;
     private final File zipPath;
-    private final boolean chromeForTesting;
     private final boolean onlyStableBuilds;
 
     public DriverPatcher(@Nullable String executablePath,
                          int versionMain /* 0 = automatic */,
-                         boolean chromeForTesting,
                          boolean onlyStableBuilds /* setting for chromeLabs=true and versionMain=0, otherwise no impact*/) throws IOException {
-        this.chromeForTesting = chromeForTesting;
         this.onlyStableBuilds = onlyStableBuilds;
-        if(chromeForTesting) urlRepo = chromeForTestingRepo;
         String osName = System.getProperty("os.name", "").toLowerCase();
         boolean is64bit = System.getProperty("os.arch").contains("64");
         isPosix = false;
@@ -68,7 +63,7 @@ public class DriverPatcher {
                 isPosix = true;
             }else if(osName.contains("darwin") || osName.contains("mac")) {
                 // FIXME: no check for ARM64 arch
-                _zipName = chromeForTesting ? "chromedriver-mac-x64.zip" : "chromedriver_mac64.zip";
+                _zipName = "chromedriver-mac-x64.zip";
                 dataPath = userPath("Library/Application Support/java_undetected_chromedriver");
                 isPosix = true;
             }else {
@@ -80,7 +75,7 @@ public class DriverPatcher {
             }
         }
         this.latestStable = new File(dataPath, "LATEST_STABLE");
-        if(chromeForTesting) _zipName = _zipName.replace("_", "-");
+        _zipName = _zipName.replace("_", "-");
         this.zipName = _zipName;
         if(!dataPath.exists()) {
             Files.createDirectory(dataPath.toPath());
@@ -227,13 +222,12 @@ public class DriverPatcher {
     public File fetchPackage() throws IOException {
         File tempFolder = new File(System.getProperty("java.io.tmpdir"));
         File outFile = new File(tempFolder, "ju-chromedriver-" + this.versionMain + "-" + new Random().nextInt(999_999) + ".zip");
-        String nameUrl;
-        if(chromeForTesting) {
-            String driverType = zipName.replace(".zip", "")
-                    .replace("chromedriver-", "");
-            // chromedriver-win32.zip -> win32
-            nameUrl = driverType + "/" + zipName;
-        }else nameUrl = zipName;
+
+        String driverType = zipName.replace(".zip", "")
+                .replace("chromedriver-", "");
+        // chromedriver-win32.zip -> win32
+        String nameUrl = driverType + "/" + zipName;
+
         URL url = new URL("%s/%s/%s".formatted(urlRepo, versionFull, nameUrl));
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestMethod("GET");
@@ -357,9 +351,9 @@ public class DriverPatcher {
 
     public String fetchReleaseNumber() throws IOException {
         try {
-            return "R" + (chromeForTesting ? _fetchFromCFT() : _fetch());
+            return "R" + _fetchFromCFT();
         }catch(IOException e) {
-            logger.warn("Failed to fetch release number from " + (chromeForTesting ? "CFT" : "chromedriver.storage.googleapis.com"), e);
+            logger.warn("Failed to fetch release number from CFT", e);
             if(latestStable.exists()) {
                 try(FileInputStream in = new FileInputStream(latestStable)) {
                     return "C"+new String(in.readAllBytes());
