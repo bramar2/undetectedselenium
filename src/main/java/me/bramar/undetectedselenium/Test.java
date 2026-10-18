@@ -21,11 +21,10 @@ class Test {
         System.out.println("Quitting");
     }
     public static void test1() throws IOException, ReflectiveOperationException {
-        // UC, driverFromCFT currently defaults to false (which only allows versions <= 113)
         UndetectedChromeDriver driver = UndetectedChromeDriver.builder()
                 .build();
 
-        driver.cloudflareGet(testUrl);
+        driver.get(testUrl);
         w();
         driver.quit();
     }
@@ -33,18 +32,6 @@ class Test {
         ChromeDriver driver = new ChromeDriver();
         SeleniumStealthOptions.getDefault().apply(driver);
         driver.get(testUrl);
-        w();
-        driver.quit();
-    }
-    public static void test3() throws IOException, ReflectiveOperationException {
-        UndetectedChromeDriver driver = UndetectedChromeDriver.builder()
-                .pageLoadStrategy(PageLoadStrategy.NONE)
-                .headless(false)
-                .versionMain(115)
-                .autoOpenDevtools(true)
-                .serviceBuilder(new ChromeDriverService.Builder().withSilent(true).withLogLevel(ChromiumDriverLogLevel.OFF))
-                .seleniumStealth(SeleniumStealthOptions.getDefault()).build();
-        System.out.println("Bypassed: " + driver.cloudflareGet(testUrl));
         w();
         driver.quit();
     }
@@ -60,8 +47,7 @@ class Test {
                     .versionMain(115)
                     .autoOpenDevtools(true)
                     .seleniumStealth(SeleniumStealthOptions.getDefault()).build();
-            if(driver.cloudflareGet(testUrl)) success++;
-            else fail++;
+            driver.get(testUrl);
             Thread.sleep(2391);
             driver.quit();
             System.out.println((headless ? "Headless" : "Headful") + " Success: " + success + " Fail: " + fail + " | Success Rate: " + (success / attempts * 100d) + "% Attempts = " + (i+1) + "/" + attempts + " (" + ((i+1)/attempts*100d)+"%)");

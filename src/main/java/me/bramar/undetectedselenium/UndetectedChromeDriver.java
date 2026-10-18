@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.Accessors;
 import lombok.experimental.Delegate;
+import org.jspecify.annotations.NonNull;
 import org.openqa.selenium.*;
 import org.openqa.selenium.bidi.HasBiDi;
 import org.openqa.selenium.chrome.ChromeDriver;
@@ -22,8 +23,6 @@ import org.openqa.selenium.federatedcredentialmanagement.HasFederatedCredentialM
 import org.openqa.selenium.interactions.Interactive;
 import org.openqa.selenium.logging.HasLogEvents;
 import org.openqa.selenium.net.PortProber;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.WebDriverWait;
 import org.openqa.selenium.virtualauthenticator.HasVirtualAuthenticator;
 
 import java.io.File;
@@ -31,9 +30,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.time.Duration;
+import java.nio.file.Files;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -55,7 +52,7 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
     @Getter private final boolean overrideUserAgent;
     private final Thread shutdownHook;
     private String otherUserAgent; // if overrideUserAgent is null, this is the user agent that will be set
-    private final Random rnd = new Random();
+
     private UndetectedChromeDriver(
             ChromeDriverService service,
             ChromeOptions options,
@@ -65,6 +62,7 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
         this.driver = new ChromeDriver(service, this.options = options);
         this.otherUserAgent = String.valueOf(executeScript("return navigator.userAgent")).replace("Headless", "");
     }
+
     public void updateUserAgent() {
         if(overrideUserAgent) return;
         String ua = String.valueOf(otherUserAgent == null ? executeScript("return navigator.userAgent") : otherUserAgent).replace("Headless","");
@@ -74,12 +72,14 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
                 )
         );
     }
+
     @Override
-    public void get(String url) {
+    public void get(@NonNull String url) {
         preGetScript();
         driver.get(url);
         postGetScript();
     }
+
     @Override
     public void quit() {
         driver.quit();
@@ -91,13 +91,14 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
             }catch(InterruptedException ignored) {}
         }
     }
+
     @Override
-    public TargetLocator switchTo() {
+    public @NonNull TargetLocator switchTo() {
         return new UCTargetLocator(this);
     }
 
     @Override
-    public Map<String, Object> executeCdpCommand(String commandName, Map<String, Object> parameters) {
+    public @NonNull Map<String, Object> executeCdpCommand(String commandName, @NonNull Map<String, Object> parameters) {
         if(commandName.equalsIgnoreCase("Network.setUserAgentOverride")) {
             if(overrideUserAgent) return Collections.emptyMap();
             if(parameters.containsKey("userAgent"))
@@ -106,93 +107,6 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
         return driver.executeCdpCommand(commandName, parameters);
     }
 
-    private void delay() {
-        delay(rnd.nextInt(500, 1050));
-    }
-    private void delay(int n) {
-        try {
-            Thread.sleep(n);
-        }catch(InterruptedException ignored) {}
-    }
-    /**
-     * Can bypass CF but isnt guaranteed to work (especially on VPN/Data center IPs)
-     * Takes 10s (not recommended to use on a non-cloudflare site)
-     * @param url CF-protected site
-     * @return true if success (no checkbox detected), otherwise false
-     */
-    public boolean cloudflareGet(String url) {
-        return cloudflareGet(url, 10000);
-    }
-    /**
-     * @see UndetectedChromeDriver#cloudflareGet(String)
-     * @param url CF-protected site
-     * @param timeToWait wait time for CF to process in milliseconds
-     * @return true if success (no checkbox detected), otherwise false
-     */
-    public boolean cloudflareGet(String url, int timeToWait) {
-        try {
-            new URL(url);
-        }catch(MalformedURLException e) {
-            throw new IllegalArgumentException(e);
-        }
-        get("http://google.com");
-        Set<String> pre = getWindowHandles();
-        driver.navigate().refresh();
-        delay();
-        preGetScript();
-        String uuid = UUID.randomUUID().toString();
-        String script = "window.open('%s', '_blank');".formatted(url);
-        driver.executeScript(script);
-        try {
-            // WebDriverWait may trigger Cloudflare
-            Thread.sleep(timeToWait);
-        }catch(InterruptedException ignored) {}
-        String prev = getWindowHandle();
-        Set<String> post = getWindowHandles();
-        post.removeAll(pre);
-        post.remove(prev);
-        close();
-        switchTo().window(post.iterator().next());
-        return driver.findElements(By.id("cf-stage")).isEmpty();
-    }
-
-    public boolean _legacyCloudflareGet(String url) {
-        try {
-            new URL(url);
-        }catch(MalformedURLException e) {
-            throw new IllegalArgumentException(e);
-        }
-        get("about:blank");
-        delay();
-        preGetScript();
-        String current = getWindowHandle();
-        Set<String> handles = getWindowHandles();
-        String script = "window.open('%s', '_blank');".formatted(url);
-        driver.executeScript(script);
-        WebDriverWait wait = new WebDriverWait(driver, Duration.ofMillis(rnd.nextLong(3000,4000)));
-        wait.until(ExpectedConditions.numberOfWindowsToBe(handles.size()+1));
-        Set<String> newHandles = getWindowHandles();
-        newHandles.removeAll(handles);
-        String handle = newHandles.iterator().next();
-        switchTo().window(handle);
-        try {
-            try {
-                Thread.sleep(2139 + rnd.nextInt(49));
-            }catch(InterruptedException ignored) {}
-            driver.navigate().refresh();
-            wait.until(ExpectedConditions.not(ExpectedConditions.presenceOfElementLocated(By.id("cf-stage"))));
-        }catch(TimeoutException e) {
-            switchTo().window(current);
-            close();
-            switchTo().window(handle);
-            return cloudflareGet(url);
-        }
-        switchTo().window(current);
-        delay();
-        close();
-        switchTo().window(handle);
-        return true;
-    }
     public void postGetScript() {
         updateUserAgent();
     }
@@ -310,24 +224,6 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
         }
     }
 
-    private static Map<String, Object> undotKey(String key, Object value) {
-        if(key.contains(".")) {
-            String[] split = key.split("\\.", 2);
-            key = split[0];
-            value = undotKey(split[1], value);
-        }
-        Map<String, Object> m = new HashMap<>();
-        m.put(key, value);
-        return m;
-    }
-    private static <K, V> void mergeNested(Map<K,V> a, Map<K,V> b) {
-        for(K key : new HashSet<>(b.keySet())) {
-            if(a.containsKey(key)) {
-                if(a.get(key) instanceof Map && b.get(key) instanceof Map)
-                    mergeNested((Map<Object, Object>)a.get(key), (Map<Object, Object>) b.get(key));
-            }else a.put(key, b.get(key));
-        }
-    }
     private static Field argField;
     private static Field experimentalField;
     private static Field capsField;
@@ -466,30 +362,12 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
 
             options.addArguments("--window-size=1920,1080", "--start-maximized", "--log-level=0");
             options.setExperimentalOption("excludeSwitches", new String[] {"enable-automation"});
-            File defaultPath = new File(userDataDir, "Default");
-            File prefsFile = new File(defaultPath, "Preferences");
+
             // handlePreferences(userDataDir)
-            // commented because untested code, may break
-//            Map<String, Object> exp = experimental(options);
-//            Map<String, Object> prefs = (Map<String, Object>) exp.get("prefs");
-//            if(prefs != null) {
-//                defaultPath.mkdirs();
-//                Map<String, Object> undotPrefs = new HashMap<>();
-//                prefs.forEach((k, v) -> mergeNested(undotPrefs, undotKey(k, v)));
-//                if(prefsFile.exists()) {
-//                    try(JsonReader reader = new JsonReader(new FileReader(prefsFile))) {
-//                        Map<String, Object> map = gson.fromJson(reader,
-//                                TypeToken.getParameterized(Map.class, String.class, Object.class).getType());
-//                        mergeNested(undotPrefs, map);
-//                    }
-//                }
-//                try(FileWriter writer = new FileWriter(prefsFile)) {
-//                    writer.write(gson.toJson(undotPrefs));
-//                }
-//
-//                exp.remove("prefs");
-//            }
+            handlePrefs(options, userDataDir);
+
             // fix exit_type flag to prevent tab-restore
+            File prefsFile = new File(userDataDir, "Default/Preferences");
             if(prefsFile.exists()) {
                 Map<String, Object> prefsFileMap;
                 try(JsonReader reader = new JsonReader(new FileReader(prefsFile))) {
@@ -515,8 +393,7 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
             if(binaryExecutable != null)
                 options.setBinary(binaryExecutable);
             serviceBuilder.usingDriverExecutable(driverExecutable);
-//            System.out.println(options.asMap());
-//            System.out.println(driverExecutable);
+
             UndetectedChromeDriver driver = new UndetectedChromeDriver(
                     serviceBuilder.build(),
                     options, shutdownHook, userAgent != null);
@@ -560,6 +437,51 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
 
             seen.put(stringify, value.toString());
             return value.toString();
+        }
+    }
+    private static Map<String, Object> undotKey(String key, Object value) {
+        if(key.contains(".")) {
+            String[] split = key.split("\\.", 2);
+            key = split[0];
+            value = undotKey(split[1], value);
+        }
+        Map<String, Object> m = new HashMap<>();
+        m.put(key, value);
+        return m;
+    }
+
+    private static <K, V> void mergeNested(Map<K,V> a, Map<K,V> b) {
+        for(K key : new HashSet<>(b.keySet())) {
+            if(a.containsKey(key)) {
+                if(a.get(key) instanceof Map && b.get(key) instanceof Map)
+                    mergeNested((Map<Object, Object>)a.get(key), (Map<Object, Object>) b.get(key));
+            }else a.put(key, b.get(key));
+        }
+    }
+
+    private static void handlePrefs(ChromeOptions options, String userDataDir) throws IOException, IllegalAccessException, IllegalArgumentException {
+        File defaultPath = new File(userDataDir, "Default");
+        File prefsFile = new File(defaultPath, "Preferences");
+
+        Map<String, Object> exp = experimental(options);
+        Map<String, Object> prefs = (Map<String, Object>) exp.get("prefs");
+        if(prefs != null) {
+            if(!defaultPath.exists() || !defaultPath.isDirectory())
+                Files.createDirectories(defaultPath.toPath());
+            Map<String, Object> undotPrefs = new HashMap<>();
+            prefs.forEach((k, v) -> mergeNested(undotPrefs, undotKey(k, v)));
+            if(prefsFile.exists()) {
+                try(JsonReader reader = new JsonReader(new FileReader(prefsFile))) {
+                    Map<String, Object> map = UndetectedChromeDriver.UCBuilder.gson.fromJson(reader,
+                            TypeToken.getParameterized(Map.class, String.class, Object.class).getType());
+                    mergeNested(undotPrefs, map);
+                }
+            }
+            try(FileWriter writer = new FileWriter(prefsFile)) {
+                writer.write(UndetectedChromeDriver.UCBuilder.gson.toJson(undotPrefs));
+            }
+
+            exp.remove("prefs");
         }
     }
 }
