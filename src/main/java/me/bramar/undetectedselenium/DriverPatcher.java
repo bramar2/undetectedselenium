@@ -4,8 +4,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.HttpURLConnection;
@@ -17,6 +15,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Collections;
 import java.util.Random;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -24,7 +24,7 @@ import java.util.stream.Stream;
 // ported from Python undetected-chromedriver
 @Getter
 public class DriverPatcher {
-    private static final Logger logger = LoggerFactory.getLogger(DriverPatcher.class);
+    private static final Logger logger = Logger.getLogger(DriverPatcher.class.getName());
 
     private final File latestStable;
     private final String urlRepo = "https://storage.googleapis.com/chrome-for-testing-public";
@@ -198,7 +198,7 @@ public class DriverPatcher {
                 return;
             Files.delete(this.executablePath.toPath());
         }
-        logger.info("Downloading chromedriver {}", release);
+        logger.log(Level.INFO, "Downloading chromedriver" + release);
         File downloaded = fetchPackage();
         unzipPackage(downloaded);
         downloaded.delete();
@@ -331,7 +331,7 @@ public class DriverPatcher {
         try {
             return "R" + _fetchFromCFT();
         }catch(IOException e) {
-            logger.warn("Failed to fetch release number from CFT", e);
+            logger.log(Level.SEVERE, "Failed to fetch release number from CFT", e);
             if(latestStable.exists()) {
                 try(FileInputStream in = new FileInputStream(latestStable)) {
                     return "C"+new String(in.readAllBytes());
@@ -370,7 +370,7 @@ public class DriverPatcher {
             content = content.substring(0, matcher.start()) + toReplace + content.substring(matcher.end());
         }
         content = content.replaceAll("window\\.cdc", "window.arh");
-        if(!found) logger.warn("Something went wrong patching the binary, could not find injection code block");
+        if(!found) logger.log(Level.WARNING, "Something went wrong patching the binary, could not find injection code block");
 
         try(FileWriter writer = new FileWriter(this.executablePath, StandardCharsets.ISO_8859_1)) {
             writer.write(content.toCharArray());
