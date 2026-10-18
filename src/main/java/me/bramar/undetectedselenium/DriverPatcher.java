@@ -326,26 +326,6 @@ public class DriverPatcher {
                 throw new IllegalArgumentException("version " + versionMain + " is not available");
         }
     }
-    private String _fetch() throws IOException {
-        String path = "/latest_release";
-        if(versionMain != 0)
-            path += "_" + versionMain;
-        URL url = new URL(this.urlRepo + path.toUpperCase());
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("GET");
-        connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36");
-        connection.connect();
-        String message;
-        try(InputStream is = connection.getInputStream()) {
-            message = new String(is.readAllBytes());
-        }
-        int res = connection.getResponseCode();
-        connection.disconnect();
-        if(res < 200 || res > 299) {
-            throw new IOException("Response code " + connection.getResponseCode() + " with message " + message.substring(0, Math.min(message.length(), 100)));
-        }else
-            return message;
-    }
 
     public String fetchReleaseNumber() throws IOException {
         try {
