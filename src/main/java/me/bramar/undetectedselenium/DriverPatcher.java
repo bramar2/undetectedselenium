@@ -198,7 +198,7 @@ public class DriverPatcher {
                 return;
             Files.delete(this.executablePath.toPath());
         }
-        logger.log(Level.INFO, "Downloading chromedriver" + release);
+        logger.log(Level.INFO, "Downloading chromedriver " + release);
         File downloaded = fetchPackage();
         unzipPackage(downloaded);
         downloaded.delete();
