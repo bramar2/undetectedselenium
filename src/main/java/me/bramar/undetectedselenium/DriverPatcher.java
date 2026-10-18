@@ -29,63 +29,60 @@ public class DriverPatcher {
     private final File latestStable;
     private final String urlRepo = "https://storage.googleapis.com/chrome-for-testing-public";
     private final String zipName;
-    private File executablePath;
+    private final File zipPath;
+    private final File dataPath;
+    private final boolean onlyStableBuilds;
+
     private int versionMain;
     private String versionFull;
-    private File dataPath;
+    private File executablePath;
     private boolean customExePath;
-    private boolean isPosix;
-    private final File zipPath;
-    private final boolean onlyStableBuilds;
 
     public DriverPatcher(@Nullable String executablePath,
                          int versionMain /* 0 = automatic */,
                          boolean onlyStableBuilds /* setting for chromeLabs=true and versionMain=0, otherwise no impact*/) throws IOException {
         this.onlyStableBuilds = onlyStableBuilds;
+
         String osName = System.getProperty("os.name", "").toLowerCase();
-        boolean is64bit = System.getProperty("os.arch").contains("64");
-        isPosix = false;
-        String exeName;
-        String _zipName;
+        String osArch = System.getProperty("os.arch", "").toLowerCase();
+        boolean is64bit = osArch.contains("64");
+        boolean arm64 = osArch.equals("aarch64") || osArch.equals("arm64");
+        boolean x64 = osArch.equals("amd64") || osArch.equals("x86_64") || osArch.equals("x64");
+
+        String exeName = osName.contains("windows") ? "chromedriver.exe" : "chromedriver";
+
         if(osName.contains("windows")) {
-            if(is64bit) {
-                _zipName = "chromedriver_win64.zip";
-            }else {
-                _zipName = "chromedriver_win32.zip";
-            }
-            exeName = "chromedriver.exe";
-            dataPath = userPath("appdata/roaming/java_undetected_chromedriver");
+            this.dataPath = userPath("appdata/roaming/java_undetected_chromedriver");
+        }else if(System.getenv().containsKey("LAMBDA_TASK_ROOT")) {
+            this.dataPath = new File("tmp/java_undetected_chromedriver");
+        }else if(osName.contains("linux")) {
+            this.dataPath = userPath(".local/share/java_undetected_chromedriver");
+        }else if(osName.contains("darwin") || osName.contains("mac")) {
+            this.dataPath = userPath("Library/Application Support/java_undetected_chromedriver");
         }else {
-            exeName = "chromedriver";
-            if(osName.contains("nux")) {
-                _zipName = "chromedriver_linux64.zip";
-                dataPath = userPath(".local/share/java_undetected_chromedriver");
-                isPosix = true;
-            }else if(osName.contains("darwin") || osName.contains("mac")) {
-                // FIXME: no check for ARM64 arch
-                _zipName = "chromedriver-mac-x64.zip";
-                dataPath = userPath("Library/Application Support/java_undetected_chromedriver");
-                isPosix = true;
-            }else {
-                dataPath = userPath(".java_undetected_chromedriver");
-                _zipName = "chromedriver_%s.zip";
-            }
-            if(System.getenv().containsKey("LAMBDA_TASK_ROOT")) {
-                dataPath = new File("tmp/java_undetected_chromedriver");
-            }
-        }
-        this.latestStable = new File(dataPath, "LATEST_STABLE");
-        _zipName = _zipName.replace("_", "-");
-        this.zipName = _zipName;
-        if(!dataPath.exists()) {
-            Files.createDirectory(dataPath.toPath());
-        }
-        if(!isPosix && executablePath != null && !executablePath.endsWith(".exe")) {
-            executablePath += ".exe";
+            this.dataPath = userPath(".java_undetected_chromedriver");
         }
 
-        zipPath = new File(dataPath, "java_undetected");
-        // removed code that makes it relative to program working dir
+        if(osName.contains("windows")) {
+            this.zipName = is64bit ? "chromedriver-win64.zip" : "chromedriver-win32.zip";
+        }else if(osName.contains("linux") && arm64) {
+            this.zipName = "chromedriver-linux-arm64.zip";
+        }else if(osName.contains("linux") && x64) {
+            this.zipName = "chromedriver-linux64.zip";
+        }else if((osName.contains("darwin") || osName.contains("mac")) && arm64) {
+            this.zipName = "chromedriver-mac-arm64.zip";
+        }else if((osName.contains("darwin") || osName.contains("mac")) && x64) {
+            this.zipName = "chromedriver-mac-x64.zip";
+        }else {
+            this.zipName = "chromedriver_%s.zip";
+        }
+
+        this.latestStable = new File(dataPath, "LATEST_STABLE");
+        if(!this.dataPath.exists()) {
+            Files.createDirectory(dataPath.toPath());
+        }
+
+        this.zipPath = new File(dataPath, "java_undetected");
 
         if(executablePath != null) {
             this.executablePath = new File(executablePath);
@@ -96,6 +93,7 @@ public class DriverPatcher {
         this.versionMain = versionMain;
         this.versionFull = null;
     }
+
     private File userPath(String file) {
         return new File(new File(System.getProperty("user.home")), file);
     }
@@ -138,7 +136,7 @@ public class DriverPatcher {
 
     public void auto(int versionMain) throws IOException {
         if(customExePath) {
-            boolean patched = isBinaryPatched(this.executablePath);
+            boolean patched = isBinaryPatched(executablePath);
             if(!patched) {
                 patchExe();
             }
@@ -149,7 +147,7 @@ public class DriverPatcher {
         release = release.substring(1);
         String[] dotSplit = release.split("\\.");
         this.versionMain = Integer.parseInt(dotSplit[0]);
-        if(isCached && !this.executablePath.exists() && !customExePath) {
+        if(isCached && !executablePath.exists() && !customExePath) {
             // No internet fail-safe (uses latest stable driver available)
             File[] files = dataPath.listFiles();
             if(files == null)
@@ -187,18 +185,20 @@ public class DriverPatcher {
             this.executablePath = driverFile;
             patchExe();
             return;
-        }else
+        }else {
             this.versionFull = release;
+        }
 
         if(versionMain != 0) {
             this.versionMain = versionMain;
         }
+
         if(this.executablePath.exists()) {
             if(isBinaryPatched())
                 return;
-            this.executablePath.delete();
+            Files.delete(this.executablePath.toPath());
         }
-        logger.info("Downloading chromedriver " + release);
+        logger.info("Downloading chromedriver {}", release);
         File downloaded = fetchPackage();
         unzipPackage(downloaded);
         downloaded.delete();
@@ -212,7 +212,7 @@ public class DriverPatcher {
             try(Stream<Path> stream = Files.walk(fs.getRootDirectories().iterator().next())) {
                 for(Path p : stream.toList()) {
                     if(p.getFileName() != null && p.getFileName().toString().matches(".*chromedriver\\.exe")) {
-                        Files.copy(p, executablePath.toPath());
+                        Files.copy(p, this.executablePath.toPath());
                         return;
                     }
                 }
@@ -277,7 +277,7 @@ public class DriverPatcher {
         }
     }
     private String _fetchFromCFT() throws IOException {
-        if(versionMain != 0 && versionMain < 113) throw new IllegalArgumentException("version 112 and below is not available from chromelabs/chrome for testing");
+        if(versionMain != 0 && versionMain < 113) throw new IllegalArgumentException("version 112 and below is not supported");
 
         IOException stableException = null;
         String latestStableBuild = null;
@@ -291,8 +291,6 @@ public class DriverPatcher {
                 }catch(IOException e) {if(stableException == null) stableException = e;}
             }
         }
-
-
 
         URL url = new URL("https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone.json");
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
