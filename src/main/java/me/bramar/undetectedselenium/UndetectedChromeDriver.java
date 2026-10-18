@@ -386,7 +386,8 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
                 capsField.setAccessible(true);
             }
 
-            if(versionMain < 113) throw new IllegalArgumentException("chromedriver versions < 113 is no longer supported");
+            if(versionMain < 0) throw new IllegalArgumentException("invalid chromedriver version");
+            if(0 < versionMain && versionMain < 113) throw new IllegalArgumentException("chromedriver versions < 113 is no longer supported");
 
             if(serviceBuilder == null) serviceBuilder = new ChromeDriverService.Builder();
             DriverPatcher patcher = null;
