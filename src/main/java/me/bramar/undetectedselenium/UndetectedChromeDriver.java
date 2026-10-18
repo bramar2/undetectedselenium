@@ -18,11 +18,9 @@ import org.openqa.selenium.chrome.ChromeDriverService;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.chromium.*;
 import org.openqa.selenium.devtools.HasDevTools;
-import org.openqa.selenium.html5.LocationContext;
-import org.openqa.selenium.html5.WebStorage;
+import org.openqa.selenium.federatedcredentialmanagement.HasFederatedCredentialManagement;
 import org.openqa.selenium.interactions.Interactive;
 import org.openqa.selenium.logging.HasLogEvents;
-import org.openqa.selenium.mobile.NetworkConnection;
 import org.openqa.selenium.net.PortProber;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
@@ -44,7 +42,7 @@ import java.util.stream.Stream;
 
 public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, HasCapabilities, HasVirtualAuthenticator, Interactive,
         PrintsPage, TakesScreenshot, HasAuthentication, HasBiDi, HasCasting, HasCdp, HasDevTools, HasLaunchApp,
-        HasLogEvents, HasNetworkConditions, HasPermissions, LocationContext, NetworkConnection, WebStorage {
+        HasLogEvents, HasNetworkConditions, HasPermissions, HasDownloads, HasFederatedCredentialManagement {
     private interface UndetectedChromeDriverExclude {
         void get(String url);
         void quit();
