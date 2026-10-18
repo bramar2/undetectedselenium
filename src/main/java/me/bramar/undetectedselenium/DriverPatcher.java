@@ -25,8 +25,7 @@ import java.util.stream.Stream;
 @Getter
 public class DriverPatcher {
     private static final Logger logger = LoggerFactory.getLogger(DriverPatcher.class);
-//    old
-//    private static final String chromeLabsRepo = "https://edgedl.me.gvt1.com/edgedl/chrome/chrome-for-testing";
+
     private static final String chromeForTestingRepo = "https://storage.googleapis.com/chrome-for-testing-public";
     private final File latestStable;
     private String urlRepo = "https://chromedriver.storage.googleapis.com";
