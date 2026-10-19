@@ -1,4 +1,4 @@
-package me.bramar.undetectedselenium;
+package io.github.bramar2.undetectedselenium;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;

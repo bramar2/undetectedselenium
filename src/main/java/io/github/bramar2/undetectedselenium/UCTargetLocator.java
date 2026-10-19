@@ -1,4 +1,4 @@
-package me.bramar.undetectedselenium;
+package io.github.bramar2.undetectedselenium;
 
 import lombok.experimental.Delegate;
 import org.openqa.selenium.WebDriver;

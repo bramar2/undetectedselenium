@@ -1,9 +1,7 @@
-package me.bramar.undetectedselenium;
+package io.github.bramar2.undetectedselenium;
 
 import org.openqa.selenium.PageLoadStrategy;
 import org.openqa.selenium.chrome.ChromeDriver;
-import org.openqa.selenium.chrome.ChromeDriverService;
-import org.openqa.selenium.chromium.ChromiumDriverLogLevel;
 
 import java.io.IOException;
 import java.util.Scanner;

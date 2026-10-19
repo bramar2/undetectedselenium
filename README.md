@@ -19,7 +19,7 @@ Make sure these dependencies are installed and up to date:
 1. Selenium (org.seleniumhq.selenium:selenium-java)
 2. Gson (com.google.code.gson:gson)
 3. Slf4j-simple (org.slf4j:slf4j-simple) \
-Slf4j-simple is used to log ChromeDriver downloads and errors for ChromeDriver downloads. If you do not want to use Slf4j-simple, you can remove the usage of it in `me.bramar.undetectedselenium.DriverPatcher`.
+Slf4j-simple is used to log ChromeDriver downloads and errors for ChromeDriver downloads. If you do not want to use Slf4j-simple, you can remove the usage of it in `io.github.bramar2.undetectedselenium.DriverPatcher`.
 4. Lombok (org.projectlombok:lombok)
 ## Drivers
 
@@ -36,8 +36,8 @@ Legacy: https://chromedriver.storage.googleapis.com
 
 ```java
 
-import me.bramar.undetectedselenium.SeleniumStealthOptions;
-import me.bramar.undetectedselenium.UndetectedChromeDriver;
+import io.github.bramar2.undetectedselenium.SeleniumStealthOptions;
+import io.github.bramar2.undetectedselenium.UndetectedChromeDriver;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.edge.EdgeDriver;
 
@@ -75,7 +75,7 @@ public class Main {
                 .patchProvidedDriver(true) // defaults to false if you use custom driver, else it defaults to true
                 .build();
         ChromeDriver underlyingDriverUsed = uc3.getDriver();
-        
+
         // CF bypass that works sometimes but also slow (10s)
         // Use with caution.
         boolean success = uc3.cloudflareGet("https://nowsecure.nl");
@@ -86,7 +86,7 @@ public class Main {
 ```
 
 
-Refer to `me.bramar.undetectedselenium.Test` for examples
+Refer to `io.github.bramar2.undetectedselenium.Test` for examples
 
 ## Credit
 - Selenium-stealth/puppeteer-stealth JS files are from https://github.com/berstend/puppeteer-extra/tree/master/packages/puppeteer-extra-plugin-stealth/evasions
