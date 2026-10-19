@@ -8,7 +8,7 @@
     <version>1.2</version>
 
     <name>UndetectedSelenium</name>
-    <description>Java implementation of undetectedchromedriver and selenium-stealth.</description>
+    <description>Selenium extension to avoid bot detection.</description>
     <url>https://github.com</url>
 
     <licenses>
