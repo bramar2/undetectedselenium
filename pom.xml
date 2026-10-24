@@ -5,7 +5,7 @@
 
     <groupId>io.github.bramar2</groupId>
     <artifactId>undetectedselenium</artifactId>
-    <version>1.2</version>
+    <version>1.3</version>
 
     <name>UndetectedSelenium</name>
     <description>Selenium extension to avoid bot detection.</description>
@@ -36,7 +36,6 @@
         <maven.compiler.target>17</maven.compiler.target>
     </properties>
 
-<!--    selenium-java and gson is required to use this library, change selenium-java version as needed -->
     <dependencies>
         <dependency>
             <groupId>org.seleniumhq.selenium</groupId>
