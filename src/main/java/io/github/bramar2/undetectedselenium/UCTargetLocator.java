@@ -1,6 +1,7 @@
 package io.github.bramar2.undetectedselenium;
 
 import lombok.experimental.Delegate;
+import org.jspecify.annotations.NonNull;
 import org.openqa.selenium.WebDriver;
 
 /*
@@ -20,7 +21,7 @@ class UCTargetLocator implements WebDriver.TargetLocator {
     }
 
     @Override
-    public WebDriver window(String nameOrHandle) {
+    public @NonNull WebDriver window(@NonNull String nameOrHandle) {
         original.window(nameOrHandle);
         driver.updateUserAgent();
         return driver;

@@ -36,7 +36,15 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 // ported from Python undetected-chromedriver, uses some reflection
-
+/**
+ * Patched selenium chromedriver.
+ * Implements all interfaces a usual {@code ChromeDriver} has.
+ * <p>
+ * This is achieved by executing JavaScript and modifying the initialization
+ * options, implemented very similarly to the python alternative.
+ * <p>
+ * Credit: Based on __init__.py from ultrafunkamsterdam/undetected-chromedriver
+ */
 public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, HasCapabilities, HasVirtualAuthenticator, Interactive,
         PrintsPage, TakesScreenshot, HasAuthentication, HasBiDi, HasCasting, HasCdp, HasDevTools, HasLaunchApp,
         HasLogEvents, HasNetworkConditions, HasPermissions, HasDownloads, HasFederatedCredentialManagement {
@@ -51,7 +59,7 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
     @Getter private final ChromeOptions options;
     @Getter private final boolean overrideUserAgent;
     private final Thread shutdownHook;
-    private String otherUserAgent; // if overrideUserAgent is null, this is the user agent that will be set
+    private String otherUserAgent;
 
     private UndetectedChromeDriver(
             ChromeDriverService service,
@@ -61,16 +69,6 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
         this.overrideUserAgent = overrideUserAgent;
         this.driver = new ChromeDriver(service, this.options = options);
         this.otherUserAgent = String.valueOf(executeScript("return navigator.userAgent")).replace("Headless", "");
-    }
-
-    public void updateUserAgent() {
-        if(overrideUserAgent) return;
-        String ua = String.valueOf(otherUserAgent == null ? executeScript("return navigator.userAgent") : otherUserAgent).replace("Headless","");
-        executeCdpCommand("Network.setUserAgentOverride",
-                Map.of(
-                        "userAgent", ua
-                )
-        );
     }
 
     @Override
@@ -107,11 +105,21 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
         return driver.executeCdpCommand(commandName, parameters);
     }
 
-    public void postGetScript() {
+    protected void updateUserAgent() {
+        if(overrideUserAgent) return;
+        String ua = String.valueOf(otherUserAgent == null ? executeScript("return navigator.userAgent") : otherUserAgent).replace("Headless","");
+        executeCdpCommand("Network.setUserAgentOverride",
+                Map.of(
+                        "userAgent", ua
+                )
+        );
+    }
+
+    private void postGetScript() {
         updateUserAgent();
     }
 
-    public void preGetScript() {
+    private void preGetScript() {
         updateUserAgent();
         if(executeScript("return navigator.webdriver") != null) {
             executeCdpCommand(
@@ -224,23 +232,77 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
         }
     }
 
-    private static Field argField;
-    private static Field experimentalField;
-    private static Field capsField;
-    private static Map<String, Object> caps(MutableCapabilities cap) throws IllegalAccessException, IllegalArgumentException {
-        return (Map<String, Object>) capsField.get(cap);
-    }
-    private static Map<String, Object> experimental(ChromeOptions options) throws IllegalAccessException, IllegalArgumentException {
-        return (Map<String, Object>) experimentalField.get(options);
-    }
-    private static List<String> arguments(ChromeOptions options) throws IllegalAccessException, IllegalArgumentException {
-        return (List<String>) argField.get(options);
-    }
-
+    /**
+     * Constructs a builder for UndetectedChromeDriver, with default settings.
+     * @return a new instance of UCBuilder.
+     */
     public static UCBuilder builder() {
         return new UCBuilder();
     }
 
+    /**
+     * Builder for UndetectedChromeDriver class. Only supports major version 113 and above.
+     * <p>
+     * {@code String userDataDir}, default: None (creates temp profile that is auto-removed at exit) <br>
+     * If userDataDir is a path to a valid chrome profile directory,
+     * it will use that and turn off automatic removal mechanism at exit.
+     * <p>
+     * {@code String userAgent}, default: ChromeDriver user agent <br>
+     * Override the default ChromeDriver user agent.
+     * <p>
+     * {@code File driverExecutable}, default: downloads and patches new binary. <br>
+     * Path to the ChromeDriver binary (analogous to `chromedriver.exe`).
+     * <p>
+     * {@code File binaryExecutable}, default: find executable from $PATH <br>
+     * Path to the browser executable (analogous to `chrome.exe`)
+     * <p>
+     * {@code int port}, default: automatically picks an open port. <br>
+     * Port to be used by the chromedriver executable, this is NOT the debugger port.
+     * <p>
+     * {@code int versionMain}, default: auto (latest) <br>
+     * Major version of the ChromeDriver. Recommended to leave this.
+     * <p>
+     * {@code boolean headless}, default: false <br>
+     * Specify whether you want to use the browser in headless mode.
+     * <p>
+     * {@code boolean supressWelcome}, default: true <br>
+     * Disables a "welcome" alert that might pop up asking whether you want to set
+     * chrome as your default browser, and if you want to send even more data to google.
+     * <p>
+     * {@code boolean noSandbox}, default: true <br>
+     * Uses the --no-sandbox option, and additionally does suppress the "unsecure option" status bar.
+     * This option has a default of True since many people seem to run this as root, and chrome does not start
+     * when running as root without using --no-sandbox flag.
+     * <p>
+     * {@code boolean enableCdpEvents}, default: false <br>
+     * This enables the handling of wire messages.
+     * When enabled, you can subscribe to CDP events by using:
+     * {@code devTools.addListener(Network.dataReceived(), event -> {});}
+     * <p>
+     * {@code boolean autoOpenDevtools}, default: false <br>
+     * This automatically opens devtools using the flag "--auto-open-devtools-for-tabs"
+     * <p>
+     * {@code boolean patchProvidedDriver}, default: patches (True) only if you do not provide a custom driver binary. <br>
+     * This sets whether the driver executable binary will be patched.
+     * <p>
+     * {@code boolean onlyStableCFT}, default: true <br>
+     * If set to false, this will download the absolute latest ChromeDriver, even if it's an unstable build.
+     * <p>
+     * {@code ChromeDriverService.Builder serviceBuilder}, default: {@code new ChromeDriverService.Builder()}
+     * Specifies the ChromeDriverService.Builder used to build the base selenium ChromeDriver.
+     * <p>
+     * {@code PageLoadStrategy pageLoadStrategy}, default: NORMAL
+     * Specifies the page load strategy.
+     * Refer to the
+     * <a href="https://www.selenium.dev/documentation/webdriver/drivers/options/">selenium docs</a>
+     * for more information.
+     * <p>
+     * {@code SeleniumStealthOptions seleniumStealth}, default: none / unused
+     * Specifies SeleniumStealthOptions to apply to the ChromeDriver.
+     * <p>
+     * {@code ChromeOptions options}, default: {@code new ChromeOptions()}
+     * Specifies the ChromeOptions used to construct the base selenium ChromeDriver instance.
+     */
     @Accessors(fluent = true) @Setter @NoArgsConstructor(access = AccessLevel.PRIVATE)
     public static class UCBuilder {
         private static final Gson gson = new GsonBuilder()
@@ -252,24 +314,17 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
         private File binaryExecutable;
         private int port = 0;
         private int versionMain = 0;
-        private boolean legacyHeadless = false;
         private boolean headless = false;
         private boolean suppressWelcome = true;
         private boolean noSandbox = true;
         private boolean enableCdpEvents = false;
         private boolean autoOpenDevtools = false;
         private boolean patchProvidedDriver = false;
-        private boolean onlyStableCFT = true; // recommended to be true
-        private Map<String, Object> desiredCapabilities = new HashMap<>();
+        private boolean onlyStableCFT = true;
         private ChromeDriverService.Builder serviceBuilder;
         private PageLoadStrategy pageLoadStrategy;
         private SeleniumStealthOptions seleniumStealth;
         private ChromeOptions options = new ChromeOptions();
-
-        public UCBuilder desiredCapability(String key, String value) {
-            desiredCapabilities.put(key, value);
-            return this;
-        }
 
         public UndetectedChromeDriver build()
                 throws IllegalArgumentException, IOException, IllegalAccessException, NoSuchFieldException {
@@ -289,11 +344,11 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
             DriverPatcher patcher = null;
             if(driverExecutable == null) {
                 patcher = new DriverPatcher(null, versionMain, onlyStableCFT);
-                patcher.auto(0);
+                patcher.auto();
                 driverExecutable = patcher.getExecutablePath();
             }else if(patchProvidedDriver) {
                 patcher = new DriverPatcher(driverExecutable.getAbsolutePath(), 0, true);
-                patcher.auto(0);
+                patcher.auto();
             }
 
             int debugPort = port != 0 ? port : PortProber.findFreePort();
@@ -351,11 +406,7 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
                 options.addArguments("--no-sandbox");
             }
             if(headless) {
-                if((patcher != null && patcher.getVersionMain() < 108) || (patcher == null && legacyHeadless)) {
-                    options.addArguments("--headless=chrome");
-                }else {
-                    options.addArguments("--headless=new");
-                }
+                options.addArguments("--headless=new");
             }
             if(autoOpenDevtools)
                 options.addArguments("--auto-open-devtools-for-tabs");
@@ -364,7 +415,7 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
             options.setExperimentalOption("excludeSwitches", new String[] {"enable-automation"});
 
             // handlePreferences(userDataDir)
-            handlePrefs(options, userDataDir);
+            //handlePrefs(options, userDataDir);
 
             // fix exit_type flag to prevent tab-restore
             File prefsFile = new File(userDataDir, "Default/Preferences");
@@ -384,8 +435,6 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
                 }
             }
 
-            if(desiredCapabilities == null || desiredCapabilities.isEmpty())
-                desiredCapabilities = caps(options);
             if(pageLoadStrategy != null)
                 options.setPageLoadStrategy(pageLoadStrategy);
             if(userAgent != null)
@@ -403,7 +452,21 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
             return driver;
         }
     }
-    public static void tryDelete(File directory) {
+    private static Field argField;
+    private static Field experimentalField;
+    private static Field capsField;
+
+    private static Map<String, Object> caps(MutableCapabilities cap) throws IllegalAccessException, IllegalArgumentException {
+        return (Map<String, Object>) capsField.get(cap);
+    }
+    private static Map<String, Object> experimental(ChromeOptions options) throws IllegalAccessException, IllegalArgumentException {
+        return (Map<String, Object>) experimentalField.get(options);
+    }
+    private static List<String> arguments(ChromeOptions options) throws IllegalAccessException, IllegalArgumentException {
+        return (List<String>) argField.get(options);
+    }
+
+    private static void tryDelete(File directory) {
         File[] files = directory.listFiles();
         if(files != null) {
             for(File file : files) {
@@ -413,8 +476,8 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
         }
         directory.delete();
     }
-    // for debugging
-    public static String abbreviate(Map<Object, String> seen, Object stringify) {
+
+    private static String abbreviate(Map<Object, String> seen, Object stringify) {
         if (stringify == null) {
             return "null";
         } else {

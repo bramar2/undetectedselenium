@@ -20,6 +20,7 @@ class Test {
     }
     public static void test1() throws IOException, ReflectiveOperationException {
         UndetectedChromeDriver driver = UndetectedChromeDriver.builder()
+                .versionMain(155)
                 .build();
 
         driver.get(testUrl);
@@ -28,7 +29,6 @@ class Test {
     }
     public static void test2() {
         ChromeDriver driver = new ChromeDriver();
-        SeleniumStealthOptions.getDefault().apply(driver);
         driver.get(testUrl);
         w();
         driver.quit();

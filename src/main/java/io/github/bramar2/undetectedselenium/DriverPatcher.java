@@ -21,10 +21,19 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-// ported from Python undetected-chromedriver
+/**
+ * Patches Chromedriver binaries to avoid bot detection.
+ * <p>
+ * This is achieved by modifying the executable and replacing
+ * all occurences of {@code window.cdc}. This prevents automated
+ * browser detection scripts from identifying the WebDriver instance.
+ * <p>
+ * Credit: Based on patcher.py from ultrafunkamsterdam/undetected-chromedriver
+ */
 @Getter
 public class DriverPatcher {
     private static final Logger logger = Logger.getLogger(DriverPatcher.class.getName());
+    private static final Pattern VERSION_PATTERN = Pattern.compile("[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}");
 
     private final File latestStable;
     private final String urlRepo = "https://storage.googleapis.com/chrome-for-testing-public";
@@ -38,9 +47,18 @@ public class DriverPatcher {
     private File executablePath;
     private boolean customExePath;
 
+    /**
+     * Initializes a new {@code DriverPatcher} instance.
+     * @param executablePath Path to an existing ChromeDriver binary to be patched.
+     *                       If {@code null}, the patcher will attempt to download or reuse a ChromeDriver binary matching {@code versionMain}.
+     * @param versionMain The major version of ChromeDriver to download (e.g., {@code 155}), if the {@code executablePath} is {@code null}.
+     *                    Set to {@code 0} to automatically receive the latest build.
+     * @param onlyStableBuilds If true, forces the patcher to only download stable builds, otherwise it will download the absolute latest build.
+     * @throws IOException if an I/O error occurs while creating local directories and files, or while fetching data.
+     */
     public DriverPatcher(@Nullable String executablePath,
-                         int versionMain /* 0 = automatic */,
-                         boolean onlyStableBuilds /* setting for chromeLabs=true and versionMain=0, otherwise no impact*/) throws IOException {
+                         int versionMain,
+                         boolean onlyStableBuilds) throws IOException {
         this.onlyStableBuilds = onlyStableBuilds;
 
         String osName = System.getProperty("os.name", "").toLowerCase();
@@ -83,6 +101,8 @@ public class DriverPatcher {
         }
 
         this.zipPath = new File(dataPath, "java_undetected");
+        this.versionMain = versionMain;
+        this.versionFull = null;
 
         if(executablePath != null) {
             this.executablePath = new File(executablePath);
@@ -90,19 +110,29 @@ public class DriverPatcher {
         }else {
             this.executablePath = new File(dataPath, "java_undetected_" + fetchReleaseNumber().substring(1) + "_" + exeName);
         }
-        this.versionMain = versionMain;
-        this.versionFull = null;
     }
 
     private File userPath(String file) {
         return new File(new File(System.getProperty("user.home")), file);
     }
+
+    /**
+     * Checks if the ChromeDriver binary in {@code executablePath} is patched by detecting a pattern.
+     * @return True if the pattern was detected in the binary.
+     */
     public boolean isBinaryPatched() {
         return isBinaryPatched(null);
     }
 
-    public boolean isBinaryPatched(File executablePath) {
+    /**
+     * Checks if the binary in {@code executablePath} is patched by detecting a pattern.
+     * @param executablePath Path to an existing ChromeDriver binary to be checked. If {@code null}, it will default to the patcher's binary at {@code this.executablePath}
+     * @return True if the pattern was detected in the binary.
+     * @throws NullPointerException if {@code executablePath} is {@code null} and the patcher doesn't have an {@code executablePath}.
+     */
+    public boolean isBinaryPatched(File executablePath) throws NullPointerException {
         executablePath = executablePath == null ? this.executablePath : executablePath;
+        if(executablePath == null) throw new NullPointerException("no executable found");
         String patternString = "undetected chromedriver";
         char[] pattern = patternString.toCharArray();
         int patternLen = pattern.length;
@@ -134,7 +164,11 @@ public class DriverPatcher {
         return false;
     }
 
-    public void auto(int versionMain) throws IOException {
+    /**
+     * Executes the patcher workflow.
+     * @throws IOException if an I/O error occurs or an HTTP request failed.
+     */
+    public void auto() throws IOException {
         if(customExePath) {
             boolean patched = isBinaryPatched(executablePath);
             if(!patched) {
@@ -145,66 +179,101 @@ public class DriverPatcher {
         String release = fetchReleaseNumber();
         boolean isCached = release.startsWith("C");
         release = release.substring(1);
-        String[] dotSplit = release.split("\\.");
-        this.versionMain = Integer.parseInt(dotSplit[0]);
+        this.versionMain = Integer.parseInt(release.split("\\.")[0]);
         if(isCached && !executablePath.exists() && !customExePath) {
             // No internet fail-safe (uses latest stable driver available)
-            File[] files = dataPath.listFiles();
-            if(files == null)
-                throw new IOException("Failed to fetch chrome driver and no local drivers available");
-            File driverFile = null;
-            int[] driver = null;
-            main:
-            for(File file : files) {
-                try {
-                    String name = file.getName();
-                    if(!name.endsWith(".exe") || !name.contains("driver")) continue;
-                    Matcher matcher = Pattern.compile("[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}")
-                            .matcher(name);
-                    if(!matcher.find()) continue;
-                    String version = matcher.group();
-                    String[] s = version.split("\\.");
-                    int[] versionSplit = new int[4];
-                    for(int i = 0; i < s.length; i++)
-                        versionSplit[i] = Integer.parseInt(s[i]);
-
-
-                    if(versionSplit[0] <= versionMain) {
-                        if(driver != null) {
-                            for(int i = 0; i < versionSplit.length; i++) {
-                                if(driver[i] > versionSplit[i]) continue main;
-                            }
-                        }
-                        driverFile = file;
-                        driver = versionSplit;
-                    }
-                }catch(NumberFormatException|ArrayIndexOutOfBoundsException ignored) {}
-            }
+            File driverFile = latestLocalFile();
             if(driverFile == null)
                 throw new IOException("Failed to fetch chromedriver and no local drivers available");
             this.executablePath = driverFile;
             patchExe();
-            return;
         }else {
             this.versionFull = release;
+            if(this.executablePath.exists()) {
+                if(isBinaryPatched())
+                    return;
+                Files.delete(this.executablePath.toPath());
+            }
+            logger.log(Level.INFO, "Downloading chromedriver " + release);
+            File downloaded = fetchPackage();
+            unzipPackage(downloaded);
+            downloaded.delete();
+            patchExe();
         }
-
-        if(versionMain != 0) {
-            this.versionMain = versionMain;
-        }
-
-        if(this.executablePath.exists()) {
-            if(isBinaryPatched())
-                return;
-            Files.delete(this.executablePath.toPath());
-        }
-        logger.log(Level.INFO, "Downloading chromedriver " + release);
-        File downloaded = fetchPackage();
-        unzipPackage(downloaded);
-        downloaded.delete();
-        patchExe();
     }
-    public void unzipPackage(File zipFile) throws IOException {
+
+    /**
+     * Patches the chromedriver binary at {@code executablePath}
+     * @throws IOException if an I/O error occurs.
+     */
+    public void patchExe() throws IOException {
+        StringBuilder contentBuilder = new StringBuilder();
+        try(FileReader reader = new FileReader(this.executablePath, StandardCharsets.ISO_8859_1)) {
+            char[] buffer = new char[8192];
+            int len;
+            while((len = reader.read(buffer)) > 0) {
+                if(len == buffer.length) contentBuilder.append(buffer);
+                else {
+                    char[] slice = new char[len];
+                    System.arraycopy(buffer, 0, slice, 0, len);
+                    contentBuilder.append(slice);
+                }
+            }
+        }
+        String content = contentBuilder.toString();
+        Matcher matcher = Pattern.compile("\\{window\\.cdc.*?;\\}").matcher(content);
+        boolean found = false;
+        while(matcher.find()) {
+            found = true;
+            int len = matcher.group().length();
+            String toReplace = "{let a=\"undetected chromedriver\"}";
+            String filler = "A".repeat(len - toReplace.length());
+            toReplace = toReplace.replace("chromedriver", "chromedriver" + filler);
+            content = content.substring(0, matcher.start()) + toReplace + content.substring(matcher.end());
+        }
+        content = content.replaceAll("window\\.cdc", "window.xyz");
+        if(!found) logger.log(Level.WARNING, "Something went wrong patching the binary, could not find injection code block");
+
+        try(FileWriter writer = new FileWriter(this.executablePath, StandardCharsets.ISO_8859_1)) {
+            writer.write(content.toCharArray());
+        }
+    }
+
+    private File latestLocalFile() {
+        File[] files = dataPath.listFiles();
+        File driverFile = null;
+        int[] driver = null;
+
+        if(files == null) return null;
+        file_loop:
+        for(File file : files) {
+            try {
+                String name = file.getName();
+                if(!name.endsWith(".exe") || !name.contains("driver")) continue;
+                Matcher matcher = VERSION_PATTERN.matcher(name);
+                if(!matcher.find()) continue;
+                String version = matcher.group();
+                String[] s = version.split("\\.");
+                int[] versionSplit = new int[4];
+                for(int i = 0; i < s.length; i++)
+                    versionSplit[i] = Integer.parseInt(s[i]);
+
+
+                if(versionMain == 0 || versionSplit[0] == versionMain) {
+                    if(driver != null) {
+                        for(int i = 0; i < versionSplit.length; i++) {
+                            if(driver[i] > versionSplit[i]) continue file_loop;
+                        }
+                    }
+                    driverFile = file;
+                    driver = versionSplit;
+                }
+            }catch(NumberFormatException|ArrayIndexOutOfBoundsException ignored) {}
+        }
+        return driverFile;
+    }
+
+    private void unzipPackage(File zipFile) throws IOException {
         if(this.executablePath.exists() && !this.executablePath.delete()) {
             Files.delete(this.executablePath.toPath());
         }
@@ -219,7 +288,8 @@ public class DriverPatcher {
             }
         }
     }
-    public File fetchPackage() throws IOException {
+
+    private File fetchPackage() throws IOException {
         File tempFolder = new File(System.getProperty("java.io.tmpdir"));
         File outFile = new File(tempFolder, "ju-chromedriver-" + this.versionMain + "-" + new Random().nextInt(999_999) + ".zip");
 
@@ -254,6 +324,7 @@ public class DriverPatcher {
         connection.disconnect();
         return outFile;
     }
+
     private void fetchLatestStable() throws IOException {
         URL url = new URL("https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json");
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
@@ -276,21 +347,18 @@ public class DriverPatcher {
             }
         }
     }
-    private String _fetchFromCFT() throws IOException {
+
+    private String fetchFromCFT() throws IOException {
         if(versionMain != 0 && versionMain < 113) throw new IllegalArgumentException("version 112 and below is not supported");
 
-        IOException stableException = null;
         String latestStableBuild = null;
-        if(onlyStableBuilds && versionMain == 0) {
-            try {
-                fetchLatestStable();
-            }catch(IOException e) {stableException = e;}
-            if(latestStable.exists())  {
-                try(FileInputStream in = new FileInputStream(latestStable)) {
-                    latestStableBuild = new String(in.readAllBytes());
-                }catch(IOException e) {if(stableException == null) stableException = e;}
+        fetchLatestStable();
+        if(latestStable.exists())  {
+            try(FileInputStream in = new FileInputStream(latestStable)) {
+                latestStableBuild = new String(in.readAllBytes());
             }
         }
+        int latestStableMajor = Integer.parseInt(latestStableBuild.split("\\.")[0]);
 
         URL url = new URL("https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone.json");
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
@@ -308,12 +376,13 @@ public class DriverPatcher {
         }else {
             JsonObject json = JsonParser.parseString(message).getAsJsonObject();
             JsonObject milestones = json.getAsJsonObject("milestones");
-            if(milestones.has(versionMain+""))
-                return milestones.getAsJsonObject(versionMain+"").get("version").getAsString();
-            else if(versionMain == 0) {
+            if(milestones.has(versionMain + "")) {
+                if(onlyStableBuilds && versionMain > latestStableMajor) {
+                    throw new IllegalArgumentException("version main (" + versionMain + ") does not have stable builds, meanwhile onlyStableBuilds is turned on.");
+                }
+                return milestones.getAsJsonObject(versionMain + "").get("version").getAsString();
+            }else if(versionMain == 0) {
                 if(onlyStableBuilds) {
-                    if(latestStableBuild == null)
-                        throw new IOException("Failed to get latest stable build", stableException);
                     return latestStableBuild;
                 }else {
                     // not recommended since Canary/Dev/Beta builds can be unstable
@@ -322,58 +391,28 @@ public class DriverPatcher {
                         throw new IllegalStateException("failed to get release number from CFT, please manually input the version for chrome driver");
                     return milestones.getAsJsonObject(highestMainVersion + "").get("version").getAsString();
                 }
-            }else
+            }else {
                 throw new IllegalArgumentException("version " + versionMain + " is not available");
-        }
-    }
-
-    public String fetchReleaseNumber() throws IOException {
-        try {
-            return "R" + _fetchFromCFT();
-        }catch(IOException e) {
-            logger.log(Level.SEVERE, "Failed to fetch release number from CFT", e);
-            if(latestStable.exists()) {
-                try(FileInputStream in = new FileInputStream(latestStable)) {
-                    return "C"+new String(in.readAllBytes());
-                }catch(IOException e2) {
-                    try {
-                        e2.initCause(e);
-                    }catch(IllegalStateException ignored) {}
-                    throw e2;
-                }
-            }else throw e;
-        }
-    }
-    public void patchExe() throws IOException {
-        StringBuilder contentBuilder = new StringBuilder();
-        try(FileReader reader = new FileReader(this.executablePath, StandardCharsets.ISO_8859_1)) {
-            char[] buffer = new char[8192];
-            int len;
-            while((len = reader.read(buffer)) > 0) {
-                if(len == buffer.length) contentBuilder.append(buffer);
-                else {
-                    char[] slice = new char[len];
-                    System.arraycopy(buffer, 0, slice, 0, len);
-                    contentBuilder.append(slice);
-                }
             }
         }
-        String content = contentBuilder.toString();
-        Matcher matcher = Pattern.compile("\\{window\\.cdc.*?;\\}").matcher(content);
-        boolean found = false;
-        while(matcher.find()) {
-            found = true;
-            int len = matcher.group().length();
-            String toReplace = "{let a=\"undetected chromedriver\"}";
-            String filler = "A".repeat(len - toReplace.length());
-            toReplace = toReplace.replace("chromedriver", "chromedriver" + filler);
-            content = content.substring(0, matcher.start()) + toReplace + content.substring(matcher.end());
-        }
-        content = content.replaceAll("window\\.cdc", "window.arh");
-        if(!found) logger.log(Level.WARNING, "Something went wrong patching the binary, could not find injection code block");
+    }
 
-        try(FileWriter writer = new FileWriter(this.executablePath, StandardCharsets.ISO_8859_1)) {
-            writer.write(content.toCharArray());
+    private String fetchReleaseNumber() throws IOException {
+        try {
+            return "R" + fetchFromCFT();
+        }catch(IOException e) {
+            logger.log(Level.SEVERE, "Failed to fetch release number from CFT", e);
+            if(versionMain == 0) {
+                try(FileInputStream in = new FileInputStream(latestStable)) {
+                    return "C" + new String(in.readAllBytes());
+                }catch(IOException e2) {
+                    throw (IOException) e2.initCause(e);
+                }
+            }else {
+                File driverFile = latestLocalFile();
+                if(driverFile == null) throw e;
+                return "C" + VERSION_PATTERN.matcher(driverFile.getName()).group();
+            }
         }
     }
 }
