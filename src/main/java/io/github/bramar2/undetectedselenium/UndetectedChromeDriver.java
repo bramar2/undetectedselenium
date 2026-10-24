@@ -43,6 +43,11 @@ import java.util.stream.Stream;
  * This is achieved by executing JavaScript and modifying the initialization
  * options, implemented very similarly to the python alternative.
  * <p>
+ * Disclaimer: this uses deep reflection and modifies private variables at three places: <br>
+ * 1. {@code Map<String, Object> org.openqa.selenium.chromium.ChromiumOptions.args} <br>
+ * 2. {@code Map<String, Object> org.openqa.selenium.chromium.ChromiumOptions.experimentalOptions} <br>
+ * 3. {@code List<String> org.openqa.selenium.MutableCapabilities.caps} <br>
+ * <p>
  * Credit: Based on __init__.py from ultrafunkamsterdam/undetected-chromedriver
  */
 public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, HasCapabilities, HasVirtualAuthenticator, Interactive,
