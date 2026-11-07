@@ -358,6 +358,7 @@ public class DriverPatcher {
                 latestStableBuild = new String(in.readAllBytes());
             }
         }
+        if(latestStableBuild == null) throw new IOException("couldn't read latest stable build file");
         int latestStableMajor = Integer.parseInt(latestStableBuild.split("\\.")[0]);
 
         URL url = new URL("https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone.json");
