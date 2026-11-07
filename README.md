@@ -18,9 +18,7 @@ The library tries to find selenium-stealth JS in classpath:selenium-stealth/\*.j
 Make sure these dependencies are installed and up to date:
 1. Selenium (org.seleniumhq.selenium:selenium-java)
 2. Gson (com.google.code.gson:gson)
-3. Slf4j-simple (org.slf4j:slf4j-simple) \
-Slf4j-simple is used to log ChromeDriver downloads and errors for ChromeDriver downloads. If you do not want to use Slf4j-simple, you can remove the usage of it in `io.github.bramar2.undetectedselenium.DriverPatcher`.
-4. Lombok (org.projectlombok:lombok)
+3. Lombok (org.projectlombok:lombok)
 ## Drivers
 
 ChromeDrivers downloaded through undetected-selenium will be stored at the following locations. \
