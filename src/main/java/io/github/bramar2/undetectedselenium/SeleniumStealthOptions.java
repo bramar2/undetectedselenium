@@ -1,7 +1,6 @@
 package io.github.bramar2.undetectedselenium;
 
 import com.google.gson.Gson;
-import lombok.Builder;
 import lombok.Setter;
 import org.openqa.selenium.chromium.HasCdp;
 
