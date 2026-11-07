@@ -393,7 +393,7 @@ public class UndetectedChromeDriver implements WebDriver, JavascriptExecutor, Ha
             if(userDataDir == null) {
                 File tempDir =
                         new File(new File(System.getProperty("java.io.tmpdir")), "temp-java-uc-" + System.currentTimeMillis() + "-" + new Random().nextInt(100));
-                tempDir.mkdirs();
+                Files.createDirectories(tempDir.toPath());
                 Runtime.getRuntime().addShutdownHook(shutdownHook = new Thread(() -> {
                     for(int i = 0; i < 3; i++) {
                         tryDelete(tempDir);
