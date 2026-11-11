@@ -10,12 +10,16 @@ UndetectedChromeDriver uses the Java Reflection API to access and modify private
 You can use SeleniumStealthOptions safely without reflection.
 ## Install
 
-To use the library, you can clone the repository and just copy all the src code into your project. \
-If you plan on using selenium-stealth, make sure to include the JS files located at src/main/resources/selenium-stealth/\*.js. \
-The library tries to find selenium-stealth JS in classpath:selenium-stealth/\*.js. SeleniumStealth will fail (or work unexpectedly) if not included.
+```xml
+<dependency>
+  <groupId>io.github.bramar2</groupId>
+  <artifactId>undetectedselenium</artifactId>
+  <version>1.4</version>
+</dependency>
+```
 
 ## Dependencies
-Make sure these dependencies are installed and up to date:
+The library depends on these dependencies:
 1. Selenium (org.seleniumhq.selenium:selenium-java)
 2. Gson (com.google.code.gson:gson)
 3. Lombok (org.projectlombok:lombok)
