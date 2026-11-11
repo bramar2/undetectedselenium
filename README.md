@@ -14,7 +14,7 @@ You can use SeleniumStealthOptions safely without reflection.
 <dependency>
   <groupId>io.github.bramar2</groupId>
   <artifactId>undetectedselenium</artifactId>
-  <version>1.4</version>
+  <version>1.5</version>
 </dependency>
 ```
 
