@@ -26,13 +26,12 @@ The library depends on these dependencies:
 ## Drivers
 
 ChromeDrivers downloaded through undetected-selenium will be stored at the following locations. \
-Currently you cannot change this. But you may use your own chromedriver using `UndetectedChromeDriver.driverExecutable(new File("path/to/chromedriver"))` \
-Windows: Appdata/Roaming/java_undetected_chromedriver \
-Mac: Library/Application Support/java_undetected_chromedriver \
-Linux: .local/share/java_undetected_chromedriver \
-These are copied from undetected-chromedriver. Drivers are downloaded from: \
-CFT: https://storage.googleapis.com/chrome-for-testing-public \
-Legacy: https://chromedriver.storage.googleapis.com
+Currently you cannot change this. But you may use your own chromedriver using `UndetectedChromeDriver.driverExecutable(new File("path/to/chromedriver"))`
+* Windows: Appdata/Roaming/java_undetected_chromedriver
+* Mac: Library/Application Support/java_undetected_chromedriver
+* Linux: .local/share/java_undetected_chromedriver
+
+These are copied from [undetected-chromedriver](https://github.com/ultrafunkamsterdam/undetected-chromedriver). Drivers are downloaded from [CFT](https://storage.googleapis.com/chrome-for-testing-public) ([Legacy](https://chromedriver.storage.googleapis.com) is no longer supported)
 
 ## Usage
 
@@ -91,5 +90,8 @@ public class Main {
 Refer to `io.github.bramar2.undetectedselenium.Test` for examples
 
 ## Credit
-- Selenium-stealth/puppeteer-stealth JS files are from https://github.com/berstend/puppeteer-extra/tree/master/packages/puppeteer-extra-plugin-stealth/evasions
-- UndetectedChromeDriver stealth techniques are partially from https://github.com/ultrafunkamsterdam/undetected-chromedriver
+- Selenium-stealth/puppeteer-stealth JS files are from [puppeteer-extra-plugin-stealth](https://github.com/berstend/puppeteer-extra/tree/master/packages/puppeteer-extra-plugin-stealth/evasions)
+- UndetectedChromeDriver stealth techniques are partially from [undetected-chromedriver](https://github.com/ultrafunkamsterdam/undetected-chromedriver)
+
+## License
+Licensed under GPL-3.0 following [undetected-chromedriver](https://github.com/ultrafunkamsterdam/undetected-chromedriver)
